@@ -51,6 +51,8 @@ Options:
                         Encoding for input and output files.
   -o OUTPUT_FORMAT, --output_format=OUTPUT_FORMAT
                         Use output format 'xhtml' (default) or 'html'.
+  --tab_length=TAB_LENGTH
+                        Number of spaces per tab in the source. Defaults to 4.
   -x EXTENSION, --extension=EXTENSION
                         Load extension EXTENSION.
   -c CONFIG_FILE, --extension_configs=CONFIG_FILE
