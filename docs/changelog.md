@@ -16,6 +16,8 @@ See the [Contributing Guide](contributing.md) for details.
 
 ### Fixed
 
+* Fix reference-style links whose label contains a code span, such as
+  `[`foo`]` or `[text][`foo`]`, so that they are rendered as links (#7).
 * Support automatic links with URL schemes other than HTTP and FTP, such as
   `<ssh://example.org>` (#1244).
 * Fix quadratic-time id generation in the `toc` extension when many headers
