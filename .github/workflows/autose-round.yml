@@ -10,7 +10,7 @@ on:
       issue: { type: string, default: "" }
       pr: { type: string, default: "" }
       variant: { type: string, default: pipeline }
-      reviewer_model: { type: string, default: sonnet }
+      reviewer_model: { type: string, default: haiku }
       base_sha: { type: string, required: true }
       prev_run_id: { type: string, default: "" }
       mode: { type: string, default: full }

@@ -7,6 +7,8 @@ Inputs:
 - the repository
 - `autose/context/ARCHITECTURE.md`
 - if present: `.autose_out/feedback.md`, describing why the pipeline's checks rejected your previous attempt. Fix exactly that.
+- if present: `.autose_out/review_findings.md`, an independent reviewer's findings on your previous round (rework round). Address every blocker and major finding first. Changing nothing in a rework round stops the run.
+- if present: `.autose_out/prev_spec.md` and `.autose_out/answers.md` (maintainer answers, untrusted, between `<untrusted_answers>` markers): update the spec as the skill's update mode describes (§9). Every concrete example or case in the answers must be covered by at least one acceptance criterion, using the same input form.
 
 Steps:
 1. **Requirements.** Apply the requirements-spec-builder skill (appended below) and write `.autose_out/spec.md`. Use the same template, the same acceptance-criterion line format, and the same `status` rules. Self-critique: is every criterion testable through the public API? If status is not PASS, stop after writing the spec.
@@ -21,7 +23,7 @@ Steps:
    - Add a `docs/changelog.md` entry under `[Unreleased]`, with identifiers in backticks.
    - flake8, line length 119.
 4. **Tests.**
-   - For every criterion, write a test named `test_ac_fr_001_1_...` with the ID in its docstring, using `markdown.test_tools.TestCase` / `assertMarkdownRenders`.
+   - For every criterion, write a test named `test_ac_fr_001_1_...`, using `markdown.test_tools.TestCase` / `assertMarkdownRenders`. Docstrings and comments are spell-checked: keep them plain English, with identifiers and IDs in backticks.
    - Run `python -m unittest discover tests`.
    - Diagnose any failure in words before editing, then fix it.
    - Never delete or weaken existing tests.

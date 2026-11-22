@@ -1,4 +1,4 @@
-"""Static configuration: models, budgets, permissions (ADR-005, ADR-006, ADR-009)."""
+"""Static configuration: models, budgets, permissions (ADR-005, ADR-012, ADR-015)."""
 from __future__ import annotations
 
 import os
@@ -6,7 +6,7 @@ import os
 # Directory (inside the checkout, git-excluded) where a job keeps its artifacts and agent inputs.
 OUT_DIR = os.environ.get("AUTOSE_OUT", ".autose_out")
 
-# ADR-006: Haiku for the producing roles, Sonnet for the reviewer, effort medium.
+# ADR-015 (supersedes ADR-006): Haiku for every role incl. the reviewer; AUTOSE_REVIEWER_MODEL=sonnet selects Sonnet.
 # ADR-009: per-role turn caps and wall-clock limits (seconds).
 ROLES: dict[str, dict] = {
     "requirements": {"model": "haiku", "effort": "medium", "max_turns": 20, "timeout": 900},
@@ -14,7 +14,7 @@ ROLES: dict[str, dict] = {
     "implementer": {"model": "haiku", "effort": "medium", "max_turns": 40, "timeout": 1500},
     "tester": {"model": "haiku", "effort": "medium", "max_turns": 30, "timeout": 1200},
     "single": {"model": "haiku", "effort": "medium", "max_turns": 80, "timeout": 3000},
-    "reviewer": {"model": "sonnet", "effort": "medium", "max_turns": 30, "timeout": 1500},
+    "reviewer": {"model": "haiku", "effort": "medium", "max_turns": 30, "timeout": 1500},  # ADR-015 (was Sonnet)
 }
 
 # ADR-002 / ADR-009: retry budgets inside one round.

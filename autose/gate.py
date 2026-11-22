@@ -57,7 +57,7 @@ def last_status(repo: str, issue: str) -> dict:
 
 
 def decide(event_name: str, event: dict, repo: str, sha: str) -> dict:
-    d = {"run": "false", "mode": "", "issue": "", "pr": "", "variant": "pipeline", "reviewer_model": "sonnet",
+    d = {"run": "false", "mode": "", "issue": "", "pr": "", "variant": "pipeline", "reviewer_model": "haiku",
          "prev_run_id": "", "base_sha": sha, "reason": ""}
     sender = (event.get("sender") or {}).get("login", "")
     if event_name == "workflow_dispatch":
@@ -71,7 +71,7 @@ def decide(event_name: str, event: dict, repo: str, sha: str) -> dict:
             d["reason"] = f"PR #{num} is not a branch of {repo}; AutoSE reviews only branches in this repository"
             return d
         d.update(run="true", mode=mode, variant=inp.get("variant", "pipeline"),
-                 reviewer_model=inp.get("reviewer_model", "sonnet"))
+                 reviewer_model=inp.get("reviewer_model", "haiku"))
         d["pr" if mode == "review-only" else "issue"] = num
         d["reason"] = f"manual dispatch by {sender}"
         return d

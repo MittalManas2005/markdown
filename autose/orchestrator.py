@@ -235,8 +235,12 @@ class Build:
         for attempt in range(1, config.BUDGETS["impl_attempts"] + 1):
             if feedback:
                 write_feedback("feedback.md", "The pipeline's checks rejected your previous attempt", feedback)
-            prompt = (f"Resolve issue #{self.args.issue} (base commit {self.args.base_sha}) following all four "
-                      "steps." if session is None else
+            rework = (self.out / "review_findings.md").exists()
+            first = (f"Rework round {self.args.round} for issue #{self.args.issue}: the previous round's work is in the "
+                     "repository. Read .autose_out/review_findings.md and fix every blocker and major finding, then "
+                     "re-check all four steps." if rework else
+                     f"Resolve issue #{self.args.issue} (base commit {self.args.base_sha}) following all four steps.")
+            prompt = (first if session is None else
                       "The pipeline's checks rejected your work. Read .autose_out/feedback.md and fix exactly that.")
             res = run_agent("single", prompt, stage="1-4-single", attempt=attempt, resume=session)
             session = res.session_id or session
@@ -287,6 +291,11 @@ class Build:
     def finish_ok(self) -> None:
         checks.write_patch(REPO, self.args.base_sha, self.out / "diff.patch")
         checks.write_patch(REPO, self.start_sha, self.out / "round.patch")
+        round_patch = self.out / "round.patch"
+        if self.args.round > 1 and not (round_patch.exists() and round_patch.read_text().strip()):
+            # E1 run 45011722169: a rework round changed nothing, passed every check, and only failed at release.
+            raise Stop(3, "failed", "rework round made no change: the reviewer's findings in review_findings.md "
+                                    "were not addressed")
         self.state.set(status="ready", finished=True)
         gh_output(status="ready", stop_stage="", stop_reason="")
 

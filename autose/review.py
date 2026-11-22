@@ -11,9 +11,12 @@ import os
 import re
 import sys
 from pathlib import Path
+from typing import Callable
 
+from . import config
 from .claude_runner import AgentEnvironmentError, AgentResult, run_agent
 from .common import gh_output, git_exclude, log, run
+from .gate import ALLOWED_ASSOC, has_write
 
 OUT = Path(os.environ.get("AUTOSE_OUT", ".autose_review"))
 
@@ -105,6 +108,34 @@ def render(v: dict, pr: str, issue: str, rnd: int, model: str, commands: list[di
             "A maintainer decides whether to merge._\n")
 
 
+def maintainer_answers(comments: list[dict], writer: Callable[[str], bool]) -> list[str]:
+    """The maintainer's clarifications: `/autose` comments with text, by people with write access (ADR-016).
+
+    These are exactly the comments the gate accepts as answers. Bot comments (status reports) and agent output
+    are never included, so the reviewer still sees nothing the implementing agents wrote."""
+    out = []
+    for c in comments:
+        body = (c.get("body") or "").strip()
+        user = c.get("user") or {}
+        if not body.startswith("/autose") or user.get("type") == "Bot":
+            continue
+        if c.get("author_association") not in ALLOWED_ASSOC or not writer(user.get("login", "")):
+            continue
+        text = body[len("/autose"):].strip()
+        if text:
+            out.append(text)
+    return out
+
+
+def issue_markdown(number: str, data: dict, answers: list[str]) -> str:
+    text = (f"# Issue #{number}: {data.get('title', '')}\n\n<untrusted_issue>\n{data.get('body') or ''}\n"
+            "</untrusted_issue>\n")
+    if answers:
+        text += ("\n## Maintainer answers (clarifications posted on the issue; part of the requirements)\n\n"
+                 + "\n".join(f"<untrusted_answers>\n{a}\n</untrusted_answers>\n" for a in answers))
+    return text
+
+
 def resolve_issue(pr_info: dict, given: str) -> str:
     if given:
         return given
@@ -122,7 +153,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--round", type=int, default=1)
     a = ap.parse_args(argv)
     repo = os.environ["GITHUB_REPOSITORY"]
-    model = os.environ.get("AUTOSE_REVIEWER_MODEL", "sonnet")
+    model = config.model_for("reviewer")
     OUT.mkdir(exist_ok=True)
     git_exclude(f"{OUT.name}/")
 
@@ -132,8 +163,9 @@ def main(argv: list[str] | None = None) -> int:
     if not issue:
         raise SystemExit("cannot determine which issue this PR addresses")
     data = json.loads(run(["gh", "issue", "view", issue, "--repo", repo, "--json", "number,title,body,author"]).stdout)
-    (OUT / "issue.md").write_text(f"# Issue #{issue}: {data.get('title', '')}\n\n<untrusted_issue>\n"
-                                  f"{data.get('body') or ''}\n</untrusted_issue>\n")
+    comments = json.loads(run(["gh", "api", "--paginate", f"repos/{repo}/issues/{issue}/comments"]).stdout or "[]")
+    answers = maintainer_answers(comments, lambda login: has_write(repo, login))
+    (OUT / "issue.md").write_text(issue_markdown(issue, data, answers))
     base = info["baseRefName"]
     run(["git", "fetch", "origin", f"{base}:refs/remotes/origin/{base}"])
     mb = run(["git", "merge-base", f"origin/{base}", "HEAD"]).stdout.strip()
