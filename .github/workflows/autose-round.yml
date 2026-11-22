@@ -61,17 +61,23 @@ jobs:
         run: |
           mkdir -p .autose_out
           gh issue view "$ISSUE" --repo "$GITHUB_REPOSITORY" --json number,title,body,author,url > .autose_out/issue.json
+      - name: Previous round number (GitHub expressions have no arithmetic)
+        id: prev
+        if: ${{ inputs.round > 1 }}
+        env:
+          ROUND: ${{ inputs.round }}
+        run: echo "n=$((ROUND - 1))" >> "$GITHUB_OUTPUT"
       - name: Previous round's build artifacts (rework)
         if: ${{ inputs.round > 1 }}
         uses: actions/download-artifact@v4
         with:
-          name: ${{ env.ART }}-r${{ inputs.round - 1 }}-build
+          name: ${{ env.ART }}-r${{ steps.prev.outputs.n }}-build
           path: .autose_prev/build
       - name: Previous round's review (rework)
         if: ${{ inputs.round > 1 }}
         uses: actions/download-artifact@v4
         with:
-          name: ${{ env.ART }}-r${{ inputs.round - 1 }}-review
+          name: ${{ env.ART }}-r${{ steps.prev.outputs.n }}-review
           path: .autose_prev/review
       - name: Stopped run's spec (resume after NEEDS_INPUT)
         if: ${{ inputs.mode == 'resume' && inputs.prev_run_id != '' }}
