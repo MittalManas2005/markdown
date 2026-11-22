@@ -12,7 +12,7 @@ Inputs:
 
 Rules:
 - Edit only files under `markdown/`, `tests/` and `docs/`. Other edits are denied, and the pipeline rejects them.
-- Add an entry to `docs/changelog.md` under `## [Unreleased]`, following the existing format. Put identifiers, options and code in backticks: the documentation is spell-checked, and code is excluded from the check.
+- Add an entry to `docs/changelog.md` under `## [Unreleased]`, following the existing format. Put identifiers, options and code in backticks: the documentation is spell-checked, and code is excluded from the check. The same applies to new docstrings and comments in `markdown/`: the pipeline runs the repository's spell check on every file you change.
 - Keep the change minimal and in the existing style (flake8, maximum line length 119). Don't reformat unrelated code.
 - Don't delete or rename existing tests. If an existing test must change because the issue asks for different behaviour, update its expected value and say so in your final message.
 - You do **not** need to write the acceptance tests: a separate Tester agent does that. Adding a quick check is fine.
