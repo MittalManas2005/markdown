@@ -16,6 +16,9 @@ See the [Contributing Guide](contributing.md) for details.
 
 ### Fixed
 
+* Fix a crash in `fenced_code` with `attr_list` when a block sets a boolean
+  option such as `linenums` without `codehilite`. The option is now written to
+  the `<code>` element like other attributes.
 * Support automatic links with URL schemes other than HTTP and FTP, such as
   `<ssh://example.org>` (#1244).
 * Fix quadratic-time id generation in the `toc` extension when many headers
