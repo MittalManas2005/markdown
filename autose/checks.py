@@ -12,8 +12,12 @@ from . import config
 from .common import clean_env, parse_front_matter, run, tail
 
 ORACLES = ("exact", "contains", "not-contains", "no-error", "raises", "property")
+# A preservation AC may carry the tag inside or after the oracle brackets: "(contains, preservation)" or
+# "(contains) (preservation)". Run 45008926010 stopped at stage 1 over exactly this form (the skill's examples
+# and this pattern disagreed); the testability rule itself (ID, label, oracle kind, Given/when/then) is unchanged.
 AC_LINE = re.compile(
-    r"(AC-(?:FR|NFR|CON)-\d{3}-\d+)\s*\[(Confirmed|Inferred)\]\s*\((" + "|".join(ORACLES) + r")\)\s*:?(.*)",
+    r"(AC-(?:FR|NFR|CON)-\d{3}-\d+)\s*\[(Confirmed|Inferred)\]\s*\((" + "|".join(ORACLES) + r")"
+    r"(?:\s*,\s*preservation)?\)\s*(?:\(preservation\)\s*)?:?(.*)",
     re.I)
 
 

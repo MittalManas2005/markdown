@@ -163,8 +163,10 @@ For every change that alters behaviour, add at least one **preservation AC** (`[
 
 *Library domain:* issue *"With the `smarty` extension, quotes inside inline code get curled. They shouldn't be."*
 - `FR-001` "When the `smarty` extension is enabled, the converter shall leave quote characters inside inline code spans unchanged." `Confirmed` as stated. Quote: "quotes inside inline code get curled. They shouldn't be."
-- `AC-FR-001-1 [Inferred]`: Given input `` `"a"` `` with extensions `["smarty"]`, when converted through the public API, then the output contains `<code>"a"</code>` (`contains`). Basis: the issue gives no example. The output form follows the repository's existing code-span tests (`EV-002`).
-- `AC-FR-001-2 [Inferred]` (preservation): Given input `"a"` outside code with `["smarty"]`, then the output still contains `&ldquo;a&rdquo;` (`EV-003`).
+- AC-FR-001-1 [Inferred] (contains): Given input `` `"a"` `` with extensions `["smarty"]`, when converted through the public API, then the output contains `<code>"a"</code>`. Basis: the issue gives no example. The output form follows the repository's existing code-span tests (`EV-002`).
+- AC-FR-001-2 [Inferred] (contains) (preservation): Given input `"a"` outside code with `["smarty"]`, when converted through the public API, then the output still contains `&ldquo;a&rdquo;` (`EV-003`).
+
+AC line format (machine-checked by the orchestrator): `AC-<ID> [Confirmed|Inferred] (<oracle kind>)`, optionally followed by `(preservation)`, then `: Given ..., when ..., then ...` on one line, with no backticks around the ID or the label.
 
 ---
 
@@ -493,3 +495,4 @@ Do not repeat the spec in the reply. The orchestrator reads the file.
 | Outputs | Three files (`.srs`, `.register`, `.validation`) | One compact `spec.md` with machine-readable front matter | The stage artifact is `spec.md`; the orchestrator reads `status` |
 | Gate | Readiness verdict only | §8.5 stage gate (PASS / NEEDS_INPUT / FAIL); `[Inferred]` ACs may proceed but are flagged | Strict Confirmed-only readiness would stop almost every real issue at Stage 1 |
 | Final message | Human-readable summary | One machine-readable line | Consumed by the orchestrator |
+| AC examples (v1.3.1, 2026-11-22) | n/a | §4.6 examples rewritten in the exact one-line AC format, with the `(preservation)` marker defined | Baseline run 45008926010 stopped at Stage 1: the old examples (oracle at the end, backticked IDs) disagreed with the format the orchestrator checks |

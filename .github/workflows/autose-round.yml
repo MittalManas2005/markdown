@@ -46,6 +46,9 @@ jobs:
           persist-credentials: false
           # rounds 2-3 continue from the PR branch; round 1 starts from the base commit
           ref: ${{ inputs.round > 1 && format('autose/issue-{0}{1}', inputs.issue, inputs.variant == 'single' && '-single' || '') || inputs.base_sha }}
+      - name: Hide other branches from the agents (other runs' fixes, seeded PRs)
+        # fetch-depth 0 downloads every branch; removing the remote deletes those refs. Agents are also denied git.
+        run: git remote remove origin
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"        # same interpreter as upstream's flake8 job

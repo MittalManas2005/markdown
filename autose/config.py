@@ -30,7 +30,11 @@ ALLOWED_CHANGE_PREFIXES = ("markdown/", "tests/", "docs/")
 # Tools denied to every agent, on top of the allowlists below.
 DENY_ALWAYS = [
     "WebFetch", "WebSearch", "Task", "NotebookEdit",
-    "Bash(curl *)", "Bash(wget *)", "Bash(git push *)", "Bash(gh *)", "Bash(pip *)",
+    "Bash(curl *)", "Bash(wget *)", "Bash(gh *)", "Bash(pip *)",
+    # All git commands: Claude Code otherwise auto-allows read-only ones (`git log`, `git show`, `git branch -a`),
+    # which would let an agent read other runs' branches (verified with Claude Code 2.1.319). The orchestrator
+    # runs every git command it needs itself.
+    "Bash(git *)",
 ]
 
 READ = ["Read", "Grep", "Glob"]
