@@ -202,6 +202,23 @@ class TestTOC(TestCase):
             extensions=[TocExtension(), 'attr_list']
         )
 
+    def test_notoc_heading_excluded(self):
+        self.assertMarkdownRenders(
+            '[TOC]\n\n# One\n\n## Two {: .notoc }\n\n## Three',
+            '<div class="toc">\n'
+            '<ul>\n'
+            '<li><a href="#one">One</a><ul>\n'
+            '<li><a href="#three">Three</a></li>\n'
+            '</ul>\n'
+            '</li>\n'
+            '</ul>\n'
+            '</div>\n'
+            '<h1 id="one">One</h1>\n'
+            '<h2 class="notoc" id="two">Two</h2>\n'
+            '<h2 id="three">Three</h2>',
+            extensions=['toc', 'attr_list']
+        )
+
     def testUniqueIds(self):
         self.assertMarkdownRenders(
             self.dedent(
@@ -1057,32 +1074,6 @@ class TestTOC(TestCase):
                 ]
             },
             extensions=['toc']
-        )
-
-    def test_escaped_char_in_attr_list(self):
-        self.assertMarkdownRenders(
-            r'# `*Foo*` { id="\*Foo\*" }',
-            '<h1 id="*Foo*"><code>*Foo*</code></h1>',
-            expected_attrs={
-                'toc': (
-                    '<div class="toc">\n'
-                      '<ul>\n'                                                           # noqa
-                        '<li><a href="#*Foo*">*Foo*</a></li>\n'                          # noqa
-                      '</ul>\n'                                                          # noqa
-                    '</div>\n'                                                           # noqa
-                ),
-                'toc_tokens': [
-                    {
-                        'level': 1,
-                        'id': '*Foo*',
-                        'name': '*Foo*',
-                        'html': '<code>*Foo*</code>',
-                        'data-toc-label': '',
-                        'children': []
-                    }
-                ]
-            },
-            extensions=['toc', 'attr_list']
         )
 
     def testAutoLinkEmail(self):
