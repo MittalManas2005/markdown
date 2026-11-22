@@ -156,8 +156,10 @@ class FencedBlockPreprocessor(Preprocessor):
                         # Only assign key/value pairs to code element if `attr_list` extension is enabled, key/value
                         # pairs were defined on the code block, and the `use_pygments` key was not set to `True`. The
                         # `use_pygments` key could be either set to `False` or not defined. It is omitted from output.
+                        # Boolean options are parsed to `True`, `False` or `None` (valueless). Serialize them as
+                        # strings so that they can be written as attributes; a valueless option means "on".
                         kv_pairs = ''.join(
-                            f' {sanitize_name(k)}="{_escape_attrib_html(v)}"'
+                            f' {sanitize_name(k)}="{_escape_attrib_html(str(True if v is None else v))}"'
                             for k, v in config.items() if k != 'use_pygments'
                         )
                     code = self._escape(m.group('code'))
