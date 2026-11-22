@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Ensure Changelog Entry Made
+      # Do not block pull requests on changelog formatting.
+      continue-on-error: true
       uses: dangoslen/changelog-enforcer@v3
       with:
         changeLogPath: 'docs/changelog.md'

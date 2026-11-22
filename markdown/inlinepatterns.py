@@ -1213,12 +1213,33 @@ class ReferenceInlineProcessor(LinkInlineProcessor):
 
         # Clean up line breaks in id
         id = self.NEWLINE_CLEANUP_RE.sub(' ', id)
+        if id not in self.md.references and util.INLINE_PLACEHOLDER_PREFIX in id:
+            # Inline code in the label was already replaced by a placeholder; rebuild its source form.
+            id = self._label_source(id).lower()
         if id not in self.md.references:  # ignore undefined refs
             return None, m.start(0), end
 
         href, title = self.md.references[id]
 
         return self.makeTag(href, title, text), m.start(0), end
+
+    def _label_source(self, label: str) -> str:
+        """ Return `label` with inline-code placeholders turned back into backtick source text. """
+        try:
+            stash = self.md.treeprocessors['inline'].stashed_nodes
+        except KeyError:  # pragma: no cover
+            return label
+
+        def repl(m: re.Match[str]) -> str:
+            value = stash.get(m.group(1))
+            if value is None:
+                return m.group(0)
+            if isinstance(value, str):
+                return value
+            if value.tag == 'code':
+                return '`' + (value.text or '') + '`'
+            return ''.join(value.itertext())
+        return util.INLINE_PLACEHOLDER_RE.sub(repl, label)
 
     def evalId(self, data: str, index: int, text: str) -> tuple[str | None, int, bool]:
         """
