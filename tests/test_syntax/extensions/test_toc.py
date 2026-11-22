@@ -19,6 +19,7 @@ Copyright 2004 Manfred Stienstra (the original version)
 License: BSD (see LICENSE.md for details).
 """
 
+import markdown as markdown_module
 from markdown.test_tools import TestCase
 from markdown import Markdown
 from markdown.extensions.toc import TocExtension, strip_tags, unique
@@ -1085,6 +1086,45 @@ class TestTOC(TestCase):
             extensions=['toc', 'attr_list']
         )
 
+    def test_valueless_id_heading(self):
+        self.assertMarkdownRenders(
+            '# Heading {: id }',
+            '<h1 id="heading">Heading</h1>',
+            extensions=['toc', 'attr_list']
+        )
+
+    def test_valueless_id_in_toc(self):
+        md = Markdown(extensions=['toc', 'attr_list'])
+        html = md.convert('[TOC]\n\n# Heading {: id }')
+        self.assertIn('<a href="#heading">Heading</a>', html)
+        self.assertEqual(len(md.toc_tokens), 1)
+        self.assertEqual(md.toc_tokens[0]['id'], 'heading')
+        self.assertEqual(md.toc_tokens[0]['name'], 'Heading')
+
+    def test_explicit_id_in_toc(self):
+        self.assertMarkdownRenders(
+            '# Heading {: id="intro" }',
+            '<h1 id="intro">Heading</h1>',
+            extensions=['toc', 'attr_list']
+        )
+        md = Markdown(extensions=['toc', 'attr_list'])
+        html = md.convert('[TOC]\n\n# Heading {: id="intro" }')
+        self.assertIn('<a href="#intro">Heading</a>', html)
+
+    def test_empty_id_heading(self):
+        self.assertMarkdownRenders(
+            '# Heading {: id="" }',
+            '<h1 id="heading">Heading</h1>',
+            extensions=['toc', 'attr_list']
+        )
+
+    def test_valueless_id_without_toc(self):
+        self.assertMarkdownRenders(
+            '# Heading {: id }',
+            '<h1 id>Heading</h1>',
+            extensions=['attr_list']
+        )
+
     def testAutoLinkEmail(self):
         self.assertMarkdownRenders(
             '## <foo@example.org>',
@@ -1492,6 +1532,71 @@ class TestTOC(TestCase):
                 ]
             },
             extensions=[TocExtension(), 'footnotes']
+        )
+
+
+class TestTOCValuelessIdAcceptance(TestCase):
+    """Tests for issue `#3`: `id` attribute handling in the `toc` extension."""
+
+    def test_ac_fr_001_1_valueless_id_does_not_raise(self):
+        """`AC-FR-001-1`: a `valueless` `id` with `toc` and `attr_list` converts without an exception."""
+        result = markdown_module.markdown(
+            '# Heading {: id }',
+            extensions=['toc', 'attr_list']
+        )
+        self.assertIsInstance(result, str)
+        self.assertIn('Heading', result)
+
+    def test_ac_fr_002_1_valueless_id_gets_generated_id(self):
+        """`AC-FR-002-1`: a heading with a `valueless` `id` gets the generated `slug` id."""
+        self.assertEqual(
+            markdown_module.markdown('# Heading {: id }', extensions=['toc', 'attr_list']),
+            '<h1 id="heading">Heading</h1>'
+        )
+
+    def test_ac_fr_002_2_valueless_id_heading_listed_in_toc(self):
+        """`AC-FR-002-2`: a heading with a `valueless` `id` is linked from the `[TOC]` block."""
+        result = markdown_module.markdown(
+            '[TOC]\n\n# Heading {: id }',
+            extensions=['toc', 'attr_list']
+        )
+        self.assertIn('<a href="#heading">Heading</a>', result)
+
+    def test_ac_fr_002_3_valueless_id_heading_token(self):
+        """`AC-FR-002-3`: the TOC token for a `valueless` `id` heading has the generated `id` and name."""
+        md = Markdown(extensions=[TocExtension(), 'attr_list'])
+        md.convert('# Heading {: id }')
+        self.assertEqual(len(md.toc_tokens), 1)
+        self.assertEqual(md.toc_tokens[0]['id'], 'heading')
+        self.assertEqual(md.toc_tokens[0]['name'], 'Heading')
+
+    def test_ac_fr_002_4_empty_id_gets_generated_id(self):
+        """`AC-FR-002-4`: an empty `id` (`id=""`) heading gets the generated `slug` id."""
+        self.assertEqual(
+            markdown_module.markdown('# Heading {: id="" }', extensions=['toc', 'attr_list']),
+            '<h1 id="heading">Heading</h1>'
+        )
+
+    def test_ac_fr_003_1_explicit_id_is_kept(self):
+        """`AC-FR-003-1`: an explicit `id` value on a heading is kept unchanged."""
+        self.assertEqual(
+            markdown_module.markdown('# Heading {: id="intro" }', extensions=['toc', 'attr_list']),
+            '<h1 id="intro">Heading</h1>'
+        )
+
+    def test_ac_fr_003_2_explicit_id_is_used_in_toc(self):
+        """`AC-FR-003-2`: an explicit `id` value is used as the link target in the `[TOC]` block."""
+        result = markdown_module.markdown(
+            '[TOC]\n\n# Heading {: id="intro" }',
+            extensions=['toc', 'attr_list']
+        )
+        self.assertIn('<a href="#intro">Heading</a>', result)
+
+    def test_ac_fr_004_1_valueless_id_without_toc_unchanged(self):
+        """`AC-FR-004-1`: with only `attr_list`, a `valueless` `id` renders as the bare attribute."""
+        self.assertEqual(
+            markdown_module.markdown('# Heading {: id }', extensions=['attr_list']),
+            '<h1 id>Heading</h1>'
         )
 
 
