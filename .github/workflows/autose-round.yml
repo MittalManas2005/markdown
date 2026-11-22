@@ -199,7 +199,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
           ref: refs/pull/${{ inputs.review_only && inputs.pr || needs.release.outputs.pr }}/head
-      - name: AutoSE's own code from the trusted base commit, never from the branch under review (ADR-012)
+      - name: AutoSE's own code from the trusted base commit, never from the branch under review (ADR-014)
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.base_sha }}
@@ -211,10 +211,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install the repository and Claude Code
+      - name: Install the repository, flake8 and Claude Code
         run: |
           python -m pip install --upgrade pip
-          pip install -e '.[testing]'
+          pip install -e '.[testing]' flake8
           npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
       - name: Sandbox for agent commands (bubblewrap + socat), self-tested before any model call (ADR-012)
         run: |
