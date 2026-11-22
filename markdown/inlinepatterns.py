@@ -1207,7 +1207,7 @@ class ReferenceInlineProcessor(LinkInlineProcessor):
         if not handled:
             return None, None, None
 
-        id, end, handled = self.evalId(data, index, text)
+        id, end, handled = self.evalId(data, index, self.code_span_source(text))
         if not handled:
             return None, None, None
 
@@ -1219,6 +1219,34 @@ class ReferenceInlineProcessor(LinkInlineProcessor):
         href, title = self.md.references[id]
 
         return self.makeTag(href, title, text), m.start(0), end
+
+    def code_span_source(self, text: str) -> str:
+        """
+        Return `text` with inline code placeholders replaced by the Markdown source of their code spans.
+
+        The backtick pass runs before the reference patterns, so a code span in the link text is already a
+        placeholder. Reference labels are matched against Markdown source, so the code span is restored with its
+        backticks. Other placeholders are returned unchanged.
+        """
+        try:
+            stash = self.md.treeprocessors['inline'].stashed_nodes
+        except KeyError:  # pragma: no cover
+            return text
+
+        def get_source(m: re.Match[str]) -> str:
+            node = stash.get(m.group(1))
+            if not isinstance(node, etree.Element) or node.tag != 'code':
+                return m.group(0)
+            # Reverse `util.code_escape`; `&amp;` must be restored last.
+            code = ''.join(node.itertext())
+            code = code.replace('&lt;', '<').replace('&gt;', '>').replace('&amp;', '&')
+            longest = max((len(run) for run in re.findall(r'`+', code)), default=0)
+            fence = '`' * (longest + 1)
+            if code.startswith('`') or code.endswith('`'):
+                code = f' {code} '
+            return f'{fence}{code}{fence}'
+
+        return util.INLINE_PLACEHOLDER_RE.sub(get_source, text)
 
     def evalId(self, data: str, index: int, text: str) -> tuple[str | None, int, bool]:
         """

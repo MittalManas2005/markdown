@@ -434,3 +434,43 @@ class TestReferenceLinks(TestCase):
                 """
             )
         )
+
+    def test_ac_fr_001_1_short_reference_code_label(self):
+        """ AC-FR-001-1: A short reference whose label is a code span resolves to its definition. """
+        self.assertMarkdownRenders(
+            self.dedent(
+                """
+                [`code`]
+
+                [`code`]: http://example.com
+                """
+            ),
+            """<p><a href="http://example.com"><code>code</code></a></p>"""
+        )
+
+    def test_ac_fr_001_2_implicit_reference_code_label(self):
+        """ AC-FR-001-2: An implicit reference whose label is a code span resolves to its definition. """
+        self.assertMarkdownRenders(
+            self.dedent(
+                """
+                [`code`][]
+
+                [`code`]: http://example.com
+                """
+            ),
+            """<p><a href="http://example.com"><code>code</code></a></p>"""
+        )
+
+    def test_ac_fr_001_3_inline_link_code_text(self):
+        """ AC-FR-001-3: An inline link whose text is a code span is unchanged by the reference fix. """
+        self.assertMarkdownRenders(
+            "[`code`](http://example.com)",
+            """<p><a href="http://example.com"><code>code</code></a></p>"""
+        )
+
+    def test_ac_fr_001_4_undefined_reference_code_label(self):
+        """ AC-FR-001-4: A short reference whose label is a code span and has no definition is not a link. """
+        self.assertMarkdownRenders(
+            "[`code`]",
+            """<p>[<code>code</code>]</p>"""
+        )
