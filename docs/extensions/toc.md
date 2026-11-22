@@ -236,6 +236,12 @@ The following options are provided to configure the output:
     included in the Table of Contents. To exclude this first level, you
     have to set `toc_depth` to `"4-6"`.
 
+To leave out a single heading, give it the class `notoc` with the
+`attr_list` extension, for example `## Title {: .notoc }`. Such a heading is
+rendered as usual, including its `id`, but it is left out of the Table of
+Contents and out of `md.toc_tokens`. Its child headings stay in the Table of
+Contents, nested under the nearest heading that is not excluded.
+
 A trivial example:
 
 ```python
