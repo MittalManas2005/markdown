@@ -1,0 +1,184 @@
+# AutoSE: issue -> spec -> design -> implementation -> tests -> PR -> independent review.
+# Design: autose-a3/architecture (ADR-001 ... ADR-011). Never merges; a person decides.
+name: AutoSE
+
+on:
+  issues:
+    types: [labeled]          # label "autose" (ADR-010)
+  issue_comment:
+    types: [created]          # "/autose" on an issue (start/resume) or on a PR (review only)
+  workflow_dispatch:          # development and experiments
+    inputs:
+      number:
+        description: "Issue number (mode full) or PR number (mode review-only)"
+        required: true
+      mode:
+        type: choice
+        options: [full, review-only]
+        default: full
+      variant:
+        description: "E1: pipeline (5 roles) or single (one Self-Reflection agent)"
+        type: choice
+        options: [pipeline, single]
+        default: pipeline
+      reviewer_model:
+        description: "E2: reviewer model"
+        type: choice
+        options: [sonnet, haiku]
+        default: sonnet
+
+permissions: {}               # every job declares exactly what it needs (ADR-009)
+
+concurrency:                  # one run per issue/PR at a time; queued, never interleaved (ADR-010)
+  group: autose-${{ github.event.issue.number || inputs.number }}
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issues' && github.event.label.name == 'autose') ||
+      (github.event_name == 'issue_comment' && startsWith(github.event.comment.body, '/autose') &&
+       github.event.comment.user.type != 'Bot')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    outputs:
+      run: ${{ steps.gate.outputs.run }}
+      mode: ${{ steps.gate.outputs.mode }}
+      issue: ${{ steps.gate.outputs.issue }}
+      pr: ${{ steps.gate.outputs.pr }}
+      variant: ${{ steps.gate.outputs.variant }}
+      reviewer_model: ${{ steps.gate.outputs.reviewer_model }}
+      prev_run_id: ${{ steps.gate.outputs.prev_run_id }}
+      base_sha: ${{ steps.gate.outputs.base_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pyyaml
+      - id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python -m autose.gate
+      - uses: actions/upload-artifact@v4
+        with:
+          name: autose-gate
+          path: .autose_gate/
+          include-hidden-files: true
+          if-no-files-found: ignore
+
+  round1:
+    needs: gate
+    if: needs.gate.outputs.run == 'true' && needs.gate.outputs.mode != 'review-only'
+    uses: ./.github/workflows/autose-round.yml
+    secrets: inherit
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: write
+      checks: read
+      actions: read
+    with:
+      round: 1
+      start_stage: requirements
+      issue: ${{ needs.gate.outputs.issue }}
+      variant: ${{ needs.gate.outputs.variant }}
+      reviewer_model: ${{ needs.gate.outputs.reviewer_model }}
+      base_sha: ${{ needs.gate.outputs.base_sha }}
+      prev_run_id: ${{ needs.gate.outputs.prev_run_id }}
+      mode: ${{ needs.gate.outputs.mode }}
+
+  round2:                     # send-back 1 (ADR-002: at most two send-backs, enforced by this graph)
+    needs: [gate, round1]
+    if: needs.round1.outputs.verdict == 'request_changes'
+    uses: ./.github/workflows/autose-round.yml
+    secrets: inherit
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: write
+      checks: read
+      actions: read
+    with:
+      round: 2
+      start_stage: ${{ needs.round1.outputs.target_stage }}
+      issue: ${{ needs.gate.outputs.issue }}
+      variant: ${{ needs.gate.outputs.variant }}
+      reviewer_model: ${{ needs.gate.outputs.reviewer_model }}
+      base_sha: ${{ needs.gate.outputs.base_sha }}
+      mode: rework
+
+  round3:                     # send-back 2 (last)
+    needs: [gate, round2]
+    if: needs.round2.outputs.verdict == 'request_changes'
+    uses: ./.github/workflows/autose-round.yml
+    secrets: inherit
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: write
+      checks: read
+      actions: read
+    with:
+      round: 3
+      start_stage: ${{ needs.round2.outputs.target_stage }}
+      issue: ${{ needs.gate.outputs.issue }}
+      variant: ${{ needs.gate.outputs.variant }}
+      reviewer_model: ${{ needs.gate.outputs.reviewer_model }}
+      base_sha: ${{ needs.gate.outputs.base_sha }}
+      mode: rework
+
+  review_only:                # "/autose" on a PR, or dispatch mode review-only (seeded PRs, experiment E2)
+    needs: gate
+    if: needs.gate.outputs.run == 'true' && needs.gate.outputs.mode == 'review-only'
+    uses: ./.github/workflows/autose-round.yml
+    secrets: inherit
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: write
+      checks: read
+      actions: read
+    with:
+      round: 1
+      review_only: true
+      pr: ${{ needs.gate.outputs.pr }}
+      variant: ${{ needs.gate.outputs.variant }}
+      reviewer_model: ${{ needs.gate.outputs.reviewer_model }}
+      base_sha: ${{ needs.gate.outputs.base_sha }}
+      mode: review-only
+
+  report:
+    needs: [gate, round1, round2, round3, review_only]
+    if: always() && needs.gate.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pyyaml
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: autose-*
+          path: artifacts
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: python -m autose.report

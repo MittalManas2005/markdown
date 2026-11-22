@@ -1,0 +1,207 @@
+# One AutoSE round: build (stages 1-4) -> release (stage 5) -> review (stage 6).
+# Called up to three times by autose.yml (round 1 + at most two send-backs), or once in review-only mode.
+name: AutoSE round
+
+on:
+  workflow_call:
+    inputs:
+      round: { type: number, required: true }
+      start_stage: { type: string, default: requirements }
+      issue: { type: string, default: "" }
+      pr: { type: string, default: "" }
+      variant: { type: string, default: pipeline }
+      reviewer_model: { type: string, default: sonnet }
+      base_sha: { type: string, required: true }
+      prev_run_id: { type: string, default: "" }
+      mode: { type: string, default: full }
+      review_only: { type: boolean, default: false }
+    outputs:
+      build_status: { value: "${{ jobs.build.outputs.status }}" }
+      stop_reason: { value: "${{ jobs.build.outputs.stop_reason }}" }
+      pr: { value: "${{ jobs.release.outputs.pr }}" }
+      ci: { value: "${{ jobs.release.outputs.ci }}" }
+      verdict: { value: "${{ jobs.review.outputs.verdict }}" }
+      target_stage: { value: "${{ jobs.review.outputs.target_stage }}" }
+
+env:
+  CLAUDE_CODE_VERSION: "2.1.319"        # pinned (ADR-005)
+  ART: autose-${{ inputs.review_only && format('pr{0}', inputs.pr) || inputs.issue }}-${{ inputs.variant }}
+
+jobs:
+  build:                                # stages 1-4; read-only token, no GitHub write access (ADR-005)
+    if: ${{ !inputs.review_only }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      issues: read
+      actions: read
+    outputs:
+      status: ${{ steps.orch.outputs.status }}
+      stop_reason: ${{ steps.orch.outputs.stop_reason }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          # rounds 2-3 continue from the PR branch; round 1 starts from the base commit
+          ref: ${{ inputs.round > 1 && format('autose/issue-{0}{1}', inputs.issue, inputs.variant == 'single' && '-single' || '') || inputs.base_sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"        # same interpreter as upstream's flake8 job
+      - name: Install the repository, flake8 and Claude Code
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[testing]' flake8
+          npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+      - name: Fetch the issue into a file (untrusted text never reaches a shell command)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ inputs.issue }}
+        run: |
+          mkdir -p .autose_out
+          gh issue view "$ISSUE" --repo "$GITHUB_REPOSITORY" --json number,title,body,author,url > .autose_out/issue.json
+      - name: Previous round's build artifacts (rework)
+        if: ${{ inputs.round > 1 }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.ART }}-r${{ inputs.round - 1 }}-build
+          path: .autose_prev/build
+      - name: Previous round's review (rework)
+        if: ${{ inputs.round > 1 }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.ART }}-r${{ inputs.round - 1 }}-review
+          path: .autose_prev/review
+      - name: Stopped run's spec (resume after NEEDS_INPUT)
+        if: ${{ inputs.mode == 'resume' && inputs.prev_run_id != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.ART }}-r1-build
+          path: .autose_prev/resume
+          run-id: ${{ inputs.prev_run_id }}
+          github-token: ${{ github.token }}
+      - name: Maintainer answer (resume)
+        if: ${{ inputs.mode == 'resume' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: autose-gate
+          path: .autose_prev/gate
+      - name: Prepare inputs
+        run: |
+          if [ -d .autose_prev/build ]; then cp .autose_prev/build/spec.md .autose_prev/build/design.md .autose_out/ 2>/dev/null || true; fi
+          if [ -f .autose_prev/review/review_findings.md ]; then cp .autose_prev/review/review_findings.md .autose_out/; fi
+          if [ -f .autose_prev/resume/spec.md ]; then cp .autose_prev/resume/spec.md .autose_out/prev_spec.md; fi
+          if [ -f .autose_prev/gate/answers_raw.md ]; then cp .autose_prev/gate/answers_raw.md .autose_out/; fi
+          rm -rf .autose_prev
+      - name: Orchestrator (stages 1-4)
+        id: orch
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ISSUE: ${{ inputs.issue }}
+          ROUND: ${{ inputs.round }}
+          START: ${{ inputs.start_stage }}
+          BASE: ${{ inputs.base_sha }}
+          VARIANT: ${{ inputs.variant }}
+        run: python -m autose.orchestrator --issue "$ISSUE" --round "$ROUND" --start-stage "$START" --base-sha "$BASE" --variant "$VARIANT"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ env.ART }}-r${{ inputs.round }}-build
+          path: .autose_out/
+          include-hidden-files: true
+
+  release:                              # stage 5; deterministic, GitHub App identity (ADR-008, ADR-010)
+    needs: build
+    if: needs.build.outputs.status == 'ready'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      checks: read
+      actions: read
+    outputs:
+      pr: ${{ steps.rel.outputs.pr }}
+      ci: ${{ steps.rel.outputs.ci }}
+    steps:
+      - id: app
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.AUTOSE_APP_ID }}
+          private-key: ${{ secrets.AUTOSE_APP_PRIVATE_KEY }}
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ inputs.base_sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pyyaml
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.ART }}-r${{ inputs.round }}-build
+          path: .autose_out
+      - id: rel
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          CHECKS_TOKEN: ${{ github.token }}
+          ISSUE: ${{ inputs.issue }}
+          ROUND: ${{ inputs.round }}
+          VARIANT: ${{ inputs.variant }}
+          BASE: ${{ inputs.base_sha }}
+        run: python -m autose.release --issue "$ISSUE" --round "$ROUND" --variant "$VARIANT" --base-sha "$BASE"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ env.ART }}-r${{ inputs.round }}-release
+          path: |
+            .autose_out/pr.md
+            .autose_out/release.json
+          include-hidden-files: true
+          if-no-files-found: ignore
+
+  review:                               # stage 6; fresh runner, never downloads build artifacts (ADR-003, ADR-008)
+    needs: [build, release]
+    if: ${{ always() && (inputs.review_only || (needs.release.result == 'success' && needs.release.outputs.ci == 'success')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: write              # posts the review as github-actions[bot]
+    outputs:
+      verdict: ${{ steps.rev.outputs.verdict }}
+      target_stage: ${{ steps.rev.outputs.target_stage }}
+    env:
+      PR: ${{ inputs.review_only && inputs.pr || needs.release.outputs.pr }}
+      AUTOSE_OUT: .autose_review
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: refs/pull/${{ inputs.review_only && inputs.pr || needs.release.outputs.pr }}/head
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install the repository and Claude Code
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[testing]'
+          npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+      - id: rev
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          AUTOSE_REVIEWER_MODEL: ${{ inputs.reviewer_model }}
+          ISSUE: ${{ inputs.issue }}
+          ROUND: ${{ inputs.round }}
+        run: python -m autose.review --pr "$PR" --issue "$ISSUE" --round "$ROUND"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ env.ART }}-r${{ inputs.round }}-review
+          path: .autose_review/
+          include-hidden-files: true
+          if-no-files-found: ignore
