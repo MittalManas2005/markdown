@@ -14,6 +14,13 @@ See the [Contributing Guide](contributing.md) for details.
 
 ## [Unreleased]
 
+### Added
+
+* The `toc` extension leaves out of the table of contents, and out of
+  `md.toc_tokens`, any heading with the class `notoc` set with `attr_list`
+  (for example, `## Title {: .notoc }`). The heading is still rendered with its
+  `id`. Existing headings with the class `notoc` are affected by this change.
+
 ### Fixed
 
 * Support automatic links with URL schemes other than HTTP and FTP, such as

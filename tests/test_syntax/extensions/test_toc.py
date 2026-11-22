@@ -1494,6 +1494,324 @@ class TestTOC(TestCase):
             extensions=[TocExtension(), 'footnotes']
         )
 
+    @staticmethod
+    def _toc_token_ids(tokens):
+        ids = []
+        for token in tokens:
+            ids.append(token['id'])
+            ids.extend(TestTOC._toc_token_ids(token['children']))
+        return ids
+
+    def test_notoc_heading_excluded_from_toc(self):
+        md = Markdown(extensions=[TocExtension(), 'attr_list'])
+        md.convert(self.dedent(
+            '''
+            [TOC]
+
+            # One
+
+            ## Two {: .notoc }
+
+            ## Three
+            '''
+        ))
+        self.assertIn('href="#one"', md.toc)
+        self.assertIn('href="#three"', md.toc)
+        self.assertNotIn('href="#two"', md.toc)
+
+    def test_notoc_heading_keeps_id_and_markup(self):
+        md = Markdown(extensions=[TocExtension(), 'attr_list'])
+        html = md.convert(self.dedent(
+            '''
+            # One
+
+            ## Two {: .notoc }
+
+            ## Three
+            '''
+        ))
+        self.assertIn('id="two"', html)
+        self.assertIn('Two</h2>', html)
+
+    def test_notoc_heading_excluded_from_toc_tokens(self):
+        md = Markdown(extensions=[TocExtension(), 'attr_list'])
+        md.convert(self.dedent(
+            '''
+            [TOC]
+
+            # One
+
+            ## Two {: .notoc }
+
+            ## Three
+            '''
+        ))
+        ids = self._toc_token_ids(md.toc_tokens)
+        self.assertNotIn('two', ids)
+        self.assertIn('one', ids)
+        self.assertIn('three', ids)
+
+    def test_notoc_with_other_classes(self):
+        md = Markdown(extensions=[TocExtension(), 'attr_list'])
+        md.convert(self.dedent(
+            '''
+            # One
+
+            ## Two {: .other .notoc }
+
+            ## Three
+            '''
+        ))
+        self.assertNotIn('href="#two"', md.toc)
+        self.assertIn('href="#three"', md.toc)
+
+    def test_other_class_unchanged(self):
+        md = Markdown(extensions=[TocExtension(), 'attr_list'])
+        md.convert(self.dedent(
+            '''
+            # One
+
+            ## Two {: .other }
+
+            ## Three
+            '''
+        ))
+        self.assertIn('href="#two"', md.toc)
+
+        plain = Markdown(extensions=[TocExtension(), 'attr_list'])
+        plain.convert(self.dedent(
+            '''
+            # One
+
+            ## Two
+
+            ## Three
+            '''
+        ))
+        self.assertEqual(md.toc_tokens, plain.toc_tokens)
+
+    def test_notoc_children_nested_under_included_ancestor(self):
+        md = Markdown(extensions=[TocExtension(), 'attr_list'])
+        md.convert(self.dedent(
+            '''
+            # One
+
+            ## Two {: .notoc }
+
+            ### Sub
+            '''
+        ))
+        self.assertIn('href="#sub"', md.toc)
+        self.assertEqual(len(md.toc_tokens), 1)
+        self.assertEqual(md.toc_tokens[0]['id'], 'one')
+        self.assertEqual([child['id'] for child in md.toc_tokens[0]['children']], ['sub'])
+
+    def test_notoc_permalink(self):
+        md = Markdown(extensions=[TocExtension(permalink=True), 'attr_list'])
+        html = md.convert(self.dedent(
+            '''
+            # One
+
+            ## Two {: .notoc }
+            '''
+        ))
+        self.assertIn('class="headerlink" href="#two"', html)
+        self.assertNotIn('href="#two"', md.toc)
+
+    def test_notoc_class_without_value(self):
+        md = Markdown(extensions=[TocExtension(), 'attr_list'])
+        md.convert(self.dedent(
+            '''
+            # One
+
+            ## Two {: class }
+            '''
+        ))
+        self.assertIn('href="#two"', md.toc)
+
+    def test_ac_fr_001_1_notoc_sibling_one_in_toc(self):
+        md = Markdown(extensions=[TocExtension(), 'attr_list'])
+        md.convert(self.dedent(
+            '''
+            [TOC]
+
+            # One
+
+            ## Two {: .notoc }
+
+            ## Three
+            '''
+        ))
+        self.assertIn('href="#one"', md.toc)
+
+    def test_ac_fr_001_2_notoc_sibling_three_in_toc(self):
+        md = Markdown(extensions=[TocExtension(), 'attr_list'])
+        md.convert(self.dedent(
+            '''
+            [TOC]
+
+            # One
+
+            ## Two {: .notoc }
+
+            ## Three
+            '''
+        ))
+        self.assertIn('href="#three"', md.toc)
+
+    def test_ac_fr_001_3_notoc_heading_not_in_toc(self):
+        md = Markdown(extensions=[TocExtension(), 'attr_list'])
+        md.convert(self.dedent(
+            '''
+            [TOC]
+
+            # One
+
+            ## Two {: .notoc }
+
+            ## Three
+            '''
+        ))
+        self.assertNotIn('href="#two"', md.toc)
+
+    def test_ac_fr_001_4_notoc_child_stays_in_toc(self):
+        md = Markdown(extensions=[TocExtension(), 'attr_list'])
+        md.convert(self.dedent(
+            '''
+            # One
+
+            ## Two {: .notoc }
+
+            ### Sub
+            '''
+        ))
+        self.assertIn('href="#sub"', md.toc)
+
+    def test_ac_fr_001_5_plain_headings_in_toc(self):
+        md = Markdown(extensions=[TocExtension()])
+        md.convert(self.dedent(
+            '''
+            # One
+
+            ## Two
+
+            ## Three
+            '''
+        ))
+        self.assertIn('href="#two"', md.toc)
+
+    def test_ac_fr_002_1_notoc_heading_keeps_id(self):
+        md = Markdown(extensions=[TocExtension(), 'attr_list'])
+        html = md.convert(self.dedent(
+            '''
+            # One
+
+            ## Two {: .notoc }
+
+            ## Three
+            '''
+        ))
+        self.assertIn('id="two"', html)
+
+    def test_ac_fr_002_2_notoc_heading_keeps_text(self):
+        md = Markdown(extensions=[TocExtension(), 'attr_list'])
+        html = md.convert(self.dedent(
+            '''
+            # One
+
+            ## Two {: .notoc }
+
+            ## Three
+            '''
+        ))
+        self.assertIn('Two</h2>', html)
+
+    def test_ac_fr_002_3_notoc_heading_keeps_permalink(self):
+        md = Markdown(extensions=[TocExtension(permalink=True), 'attr_list'])
+        html = md.convert(self.dedent(
+            '''
+            # One
+
+            ## Two {: .notoc }
+            '''
+        ))
+        self.assertIn('class="headerlink" href="#two"', html)
+
+    def test_ac_fr_003_1_notoc_heading_absent_from_toc_tokens(self):
+        md = Markdown(extensions=[TocExtension(), 'attr_list'])
+        md.convert(self.dedent(
+            '''
+            [TOC]
+
+            # One
+
+            ## Two {: .notoc }
+
+            ## Three
+            '''
+        ))
+
+        def collect_ids(tokens):
+            found = []
+            for token in tokens:
+                found.append(token['id'])
+                found.extend(collect_ids(token['children']))
+            return found
+
+        ids = collect_ids(md.toc_tokens)
+        self.assertNotIn('two', ids)
+        self.assertIn('one', ids)
+        self.assertIn('three', ids)
+
+    def test_ac_fr_004_1_other_class_heading_in_toc(self):
+        md = Markdown(extensions=[TocExtension(), 'attr_list'])
+        md.convert(self.dedent(
+            '''
+            # One
+
+            ## Two {: .other }
+
+            ## Three
+            '''
+        ))
+        self.assertIn('href="#two"', md.toc)
+
+    def test_ac_fr_004_2_other_class_toc_tokens_unchanged(self):
+        with_attr = Markdown(extensions=[TocExtension(), 'attr_list'])
+        with_attr.convert(self.dedent(
+            '''
+            # One
+
+            ## Two {: .other }
+
+            ## Three
+            '''
+        ))
+        without_attr = Markdown(extensions=[TocExtension(), 'attr_list'])
+        without_attr.convert(self.dedent(
+            '''
+            # One
+
+            ## Two
+
+            ## Three
+            '''
+        ))
+        self.assertEqual(with_attr.toc_tokens, without_attr.toc_tokens)
+
+    def test_ac_fr_005_1_several_classes_with_notoc_excluded(self):
+        md = Markdown(extensions=[TocExtension(), 'attr_list'])
+        md.convert(self.dedent(
+            '''
+            # One
+
+            ## Two {: .other .notoc }
+
+            ## Three
+            '''
+        ))
+        self.assertNotIn('href="#two"', md.toc)
+
 
 class testStripTags(TestCase):
 

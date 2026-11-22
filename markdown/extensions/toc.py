@@ -411,7 +411,11 @@ class TocTreeprocessor(Treeprocessor):
                     # Remove the data-toc-label attribute as it is no longer needed
                     del el.attrib['data-toc-label']
 
-                if int(el.tag[-1]) >= self.toc_top and int(el.tag[-1]) <= self.toc_bottom:
+                # Headings with the class `notoc` are rendered as usual but left out of the TOC.
+                # A class set without a value (e.g. `{: class }`) is stored as `None`.
+                excluded = "notoc" in (el.attrib.get("class") or "").split()
+
+                if int(el.tag[-1]) >= self.toc_top and int(el.tag[-1]) <= self.toc_bottom and not excluded:
                     toc_tokens.append({
                         'level': int(el.tag[-1]),
                         'id': unescape(el.attrib["id"]),
