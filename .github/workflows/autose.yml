@@ -24,8 +24,8 @@ on:
       reviewer_model:
         description: "E2: reviewer model"
         type: choice
-        options: [sonnet, haiku]
-        default: sonnet
+        options: [haiku, sonnet]
+        default: haiku          # ADR-015 (was sonnet, ADR-006)
 
 permissions: {}               # every job declares exactly what it needs (ADR-009)
 
