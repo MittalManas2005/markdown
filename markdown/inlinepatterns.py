@@ -1211,6 +1211,9 @@ class ReferenceInlineProcessor(LinkInlineProcessor):
         if not handled:
             return None, None, None
 
+        # Restore the source of any inline placeholders (e.g. code spans) so the id matches the definition
+        id = self.resolveLabel(id).lower()
+
         # Clean up line breaks in id
         id = self.NEWLINE_CLEANUP_RE.sub(' ', id)
         if id not in self.md.references:  # ignore undefined refs
@@ -1219,6 +1222,25 @@ class ReferenceInlineProcessor(LinkInlineProcessor):
         href, title = self.md.references[id]
 
         return self.makeTag(href, title, text), m.start(0), end
+
+    def resolveLabel(self, label: str) -> str:
+        """
+        Replace inline placeholders in a reference label with the source text they replaced.
+
+        Placeholders are created by earlier inline patterns, so a label such as `` [`foo`] `` reaches this
+        pattern as a placeholder. Source text only refers to placeholders created before it, so the
+        expansion always terminates.
+        """
+        stash = getattr(self.md.treeprocessors['inline'], 'stashed_source', {})
+
+        def get_source(m: re.Match[str]) -> str:
+            return stash.get(m.group(1), m.group(0))
+
+        while True:
+            expanded = util.INLINE_PLACEHOLDER_RE.sub(get_source, label)
+            if expanded == label:
+                return label
+            label = expanded
 
     def evalId(self, data: str, index: int, text: str) -> tuple[str | None, int, bool]:
         """
@@ -1258,6 +1280,10 @@ class ShortReferenceInlineProcessor(ReferenceInlineProcessor):
 
 class ImageReferenceInlineProcessor(ReferenceInlineProcessor):
     """ Match to a stored reference and return `img` element. """
+    def resolveLabel(self, label: str) -> str:
+        """ Image labels are not expanded, so the output for them is unchanged. """
+        return label
+
     def makeTag(self, href: str, title: str, text: str) -> etree.Element:
         """ Return an `img` [`Element`][xml.etree.ElementTree.Element]. """
         el = etree.Element("img")

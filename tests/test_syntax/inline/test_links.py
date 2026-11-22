@@ -203,6 +203,67 @@ class TestReferenceLinks(TestCase):
             """<p><a href="http://example.com">Text</a></p>"""
         )
 
+    def test_ref_link_code_in_label_shortcut(self):
+        self.assertMarkdownRenders(
+            self.dedent(
+                """
+                [`foo`]
+
+                [`foo`]: https://example.com
+                """
+            ),
+            """<p><a href="https://example.com"><code>foo</code></a></p>"""
+        )
+
+    def test_ref_link_code_in_label_full(self):
+        self.assertMarkdownRenders(
+            self.dedent(
+                """
+                [text][`foo`]
+
+                [`foo`]: https://example.com
+                """
+            ),
+            """<p><a href="https://example.com">text</a></p>"""
+        )
+
+    def test_ref_link_code_in_label_empty_id(self):
+        self.assertMarkdownRenders(
+            self.dedent(
+                """
+                [`foo`][]
+
+                [`foo`]: https://example.com
+                """
+            ),
+            """<p><a href="https://example.com"><code>foo</code></a></p>"""
+        )
+
+    def test_ref_link_code_in_label_undefined(self):
+        self.assertMarkdownRenders(
+            self.dedent(
+                """
+                [`foo`]
+
+                [`bar`]: https://example.com
+                """
+            ),
+            """<p>[<code>foo</code>]</p>"""
+        )
+
+    def test_image_ref_code_in_label_unchanged(self):
+        # Image references with a code span in the label are out of scope and keep their current output.
+        self.assertMarkdownRenders(
+            self.dedent(
+                """
+                ![`foo`]
+
+                [`foo`]: https://example.com/foo.png
+                """
+            ),
+            """<p>![<code>foo</code>]</p>"""
+        )
+
     def test_ref_link_angle_brackets_no_space(self):
         self.assertMarkdownRenders(
             self.dedent(

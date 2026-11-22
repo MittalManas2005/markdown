@@ -111,10 +111,12 @@ class InlineProcessor(Treeprocessor):
         else:
             return None, index + 1
 
-    def __stashNode(self, node: etree.Element | str, type: str) -> str:
-        """ Add node to stash. """
+    def __stashNode(self, node: etree.Element | str, type: str, source: str | None = None) -> str:
+        """ Add node to stash, and optionally record the source text it replaces. """
         placeholder, id = self.__makePlaceholder(type)
         self.stashed_nodes[id] = node
+        if source is not None:
+            self.stashed_source[id] = source
         return placeholder
 
     def __handleInline(self, data: str, patternIndex: int = 0) -> str:
@@ -320,15 +322,15 @@ class InlineProcessor(Treeprocessor):
                                 child.tail, patternIndex
                             )
 
-        placeholder = self.__stashNode(node, pattern.type())
-
         if new_style:
+            placeholder = self.__stashNode(node, pattern.type(), data[start:end])
             # Return the index just past the inserted placeholder so the
             # next call scans only the unprocessed tail. Scanning from 0
             # after every match makes repeated inline patterns quadratic.
             return "{}{}{}".format(data[:start],
                                    placeholder, data[end:]), True, start + len(placeholder)
         else:  # pragma: no cover
+            placeholder = self.__stashNode(node, pattern.type())
             return "{}{}{}{}".format(leftData,
                                      match.group(1),
                                      placeholder, match.groups()[-1]), True, (
@@ -364,6 +366,7 @@ class InlineProcessor(Treeprocessor):
 
         """
         self.stashed_nodes: dict[str, etree.Element | str] = {}
+        self.stashed_source: dict[str, str] = {}
 
         # Ensure a valid parent list, but copy passed in lists
         # to ensure we don't have the user accidentally change it on us.
