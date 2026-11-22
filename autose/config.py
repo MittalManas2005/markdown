@@ -51,7 +51,7 @@ def allowed_tools(role: str, out_dir: str = OUT_DIR) -> list[str]:
     if role == "single":
         return READ + [f"Edit({out}/**)", "Edit(./markdown/**)", "Edit(./tests/**)", "Edit(./docs/**)"] + TEST_CMDS
     if role == "reviewer":
-        return READ + ["Bash(python -m unittest *)", "Bash(python -c *)"]
+        return READ + ["Bash(python -m unittest *)", "Bash(python -m flake8 *)", "Bash(python -c *)"]
     raise ValueError(f"unknown role {role}")
 
 

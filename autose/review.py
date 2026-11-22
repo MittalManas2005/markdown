@@ -45,10 +45,19 @@ VERDICT_SCHEMA = {
 }
 
 
-def validate(v: dict | None) -> list[str]:
+def ran_test_suite(commands: list[dict] | None) -> bool:
+    """True if the reviewer itself ran unittest and it passed, according to its session transcript."""
+    return any("python -m unittest" in c["command"] and c["ok"] and "FAILED (" not in c["output_tail"]
+               for c in commands or [])
+
+
+def validate(v: dict | None, commands: list[dict] | None) -> list[str]:
     if not isinstance(v, dict):
         return ["no structured verdict returned"]
     errs = []
+    if v.get("verdict") == "approve" and not ran_test_suite(commands):
+        errs.append("approve requires evidence that the reviewer ran the tests and they passed "
+                    "(no passing `python -m unittest` command in its session transcript)")
     serious = [f for f in v.get("findings", []) if f.get("severity") in ("blocker", "major")]
     if v.get("verdict") == "request_changes":
         if not serious:
@@ -65,7 +74,21 @@ def validate(v: dict | None) -> list[str]:
     return errs
 
 
-def render(v: dict, pr: str, issue: str, rnd: int, model: str) -> str:
+def render_commands(commands: list[dict] | None) -> str:
+    if commands is None:
+        return "- (no session transcript found)"
+    if not commands:
+        return "- (none)"
+    mark = {True: "denied", False: ""}
+    lines = []
+    for c in commands:
+        status = mark[c["denied"]] or ("ok" if c["ok"] else "failed")
+        cmd = c["command"].replace("`", "'").replace("\n", " ")
+        lines.append(f"- `{cmd[:160]}` ({status})")
+    return "\n".join(lines)
+
+
+def render(v: dict, pr: str, issue: str, rnd: int, model: str, commands: list[dict] | None = None) -> str:
     finding_rows = "\n".join(
         f"| {f['severity']} | `{f['file']}`{(':' + str(f['line'])) if f.get('line') else ''} | {f['issue']} | {f['evidence']} |"
         for f in v["findings"]) or "| — | — | — | — |"
@@ -74,7 +97,9 @@ def render(v: dict, pr: str, issue: str, rnd: int, model: str) -> str:
             f"target_stage: {v['target_stage']}\nreviewer_model: {model}\n---\n\n"
             f"## AutoSE independent review (round {rnd})\n\n**Verdict: {v['verdict'].replace('_', ' ')}**"
             + (f" (back to **{v['target_stage']}**)" if v['verdict'] == 'request_changes' else "") + "\n\n"
-            f"{v['summary']}\n\n### What I verified\n{verified}\n\n### Findings\n\n"
+            f"{v['summary']}\n\n### What I verified\n{verified}\n\n"
+            f"### Commands I ran (from the session transcript, not self-reported)\n{render_commands(commands)}\n\n"
+            "### Findings\n\n"
             f"| severity | location | issue | evidence |\n|---|---|---|---|\n{finding_rows}\n\n"
             "_The reviewer saw only the issue, the diff and the repository at this PR's head. "
             "A maintainer decides whether to merge._\n")
@@ -118,16 +143,20 @@ def main(argv: list[str] | None = None) -> int:
               "diff in .autose_review/diff.patch; the repository at the PR head is the current directory.")
     res = run_agent("reviewer", prompt, stage="6-review", attempt=a.round, json_schema=VERDICT_SCHEMA)
     verdict = res.structured
-    errors = validate(verdict) if res.ok else [res.error or "reviewer failed"]
+    errors = validate(verdict, res.commands) if res.ok else [res.error or "reviewer failed"]
     if errors:
         log(f"invalid verdict: {errors}")
         (OUT / "review.md").write_text(f"---\nartefact: review\npr: {a.pr}\nverdict: error\n---\n\n"
-                                       "## AutoSE review could not be completed\n\n" + "\n".join(f"- {e}" for e in errors))
+                                       "## AutoSE review could not be completed\n\n" + "\n".join(f"- {e}" for e in errors)
+                                       + "\n\n### Commands the reviewer ran (from the session transcript)\n"
+                                       + render_commands(res.commands) + "\n")
+        if isinstance(verdict, dict):
+            (OUT / "rejected_verdict.json").write_text(json.dumps(verdict, indent=2))
         run(["gh", "pr", "review", a.pr, "--repo", repo, "--comment", "--body-file", str(OUT / "review.md")])
         gh_output(verdict="error", target_stage="none", issue=issue)
         return 0
     (OUT / "verdict.json").write_text(json.dumps(verdict, indent=2))
-    (OUT / "review.md").write_text(render(verdict, a.pr, issue, a.round, model))
+    (OUT / "review.md").write_text(render(verdict, a.pr, issue, a.round, model, res.commands))
     findings = [f for f in verdict["findings"] if f["severity"] in ("blocker", "major")]
     (OUT / "review_findings.md").write_text(
         "# Independent reviewer findings (address every item)\n\n" + verdict["summary"] + "\n\n"

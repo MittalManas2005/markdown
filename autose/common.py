@@ -47,6 +47,10 @@ def agent_env() -> dict:
     env = clean_env()
     if os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"):
         env["CLAUDE_CODE_OAUTH_TOKEN"] = os.environ["CLAUDE_CODE_OAUTH_TOKEN"]
+    # Claude Code removes its own credentials from the environment of every command an agent runs
+    # (tests, `python -c` probes), so generated code cannot read the Claude token. Verified locally
+    # with Claude Code 2.1.319: a variable from its credential list disappears, a control variable stays.
+    env["CLAUDE_CODE_SUBPROCESS_ENV_SCRUB"] = "1"
     return env
 
 

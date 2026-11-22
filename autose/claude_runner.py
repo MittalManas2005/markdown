@@ -7,6 +7,8 @@ The prompt is passed on stdin; untrusted text (issues) is only ever in files, ne
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import subprocess
 import time
 from dataclasses import dataclass, field
@@ -28,6 +30,41 @@ class AgentResult:
     subtype: str = ""
     error: str = ""
     denials: list = field(default_factory=list)
+    commands: list | None = None  # Bash commands the agent ran, read from its transcript (None: no transcript)
+
+
+def find_transcript(session_id: str | None) -> Path | None:
+    """Claude Code stores every session as <config dir>/projects/<cwd>/<session id>.jsonl."""
+    if not session_id:
+        return None
+    root = Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude") / "projects"
+    hits = sorted(root.glob(f"*/{session_id}.jsonl"), key=lambda p: p.stat().st_mtime)
+    return hits[-1] if hits else None
+
+
+def executed_commands(transcript: Path) -> list[dict]:
+    """Every Bash call in a session transcript, with whether it was denied or failed, and its output tail.
+
+    This is evidence from the CLI's own record, not the agent's claim about what it ran (ADR-007)."""
+    calls, results = {}, {}  # keyed by tool-call id: the transcript can record the same call more than once
+    for line in transcript.read_text(errors="replace").splitlines():
+        try:
+            content = (json.loads(line).get("message") or {}).get("content")
+        except json.JSONDecodeError:
+            continue
+        for block in content if isinstance(content, list) else []:
+            if block.get("type") == "tool_use" and block.get("name") == "Bash":
+                calls.setdefault(block.get("id"), str((block.get("input") or {}).get("command", "")))
+            elif block.get("type") == "tool_result":
+                text = block.get("content")
+                text = text if isinstance(text, str) else json.dumps(text)
+                results[block.get("tool_use_id")] = (bool(block.get("is_error")), text)
+    out = []
+    for call_id, command in calls.items():
+        is_error, text = results.get(call_id, (True, "(no result)"))
+        denied = is_error and "denied" in text[:300].lower()
+        out.append({"command": command, "denied": denied, "ok": not is_error, "output_tail": text[-400:]})
+    return out
 
 
 def system_prompt(role: str) -> str:
@@ -84,8 +121,19 @@ def run_agent(role: str, prompt: str, *, stage: str, attempt: int, cwd: str = ".
         log(f"agent {role}: {len(denials)} tool call(s) denied by the permission rules")
     ok = (subtype == "success") and not data.get("is_error")
     err = "" if ok else f"agent {role} ended with {subtype or 'error'}: {str(data.get('result', ''))[:500]}"
+    commands = None
+    transcript = find_transcript(data.get("session_id"))
+    if transcript:
+        shutil.copyfile(transcript, out_path("logs", f"{stage}-{role}-{attempt}.transcript.jsonl"))
+        commands = executed_commands(transcript)
+        out_path("logs", f"{stage}-{role}-{attempt}.commands.json").write_text(json.dumps(commands, indent=2))
+        ran = sum(1 for c in commands if not c["denied"])
+        log(f"agent {role}: {ran} shell command(s) ran, {len(commands) - ran} denied (from the session transcript)")
+    else:
+        log(f"agent {role}: no session transcript found; executed commands cannot be verified")
     return AgentResult(ok=ok, text=data.get("result") or "", structured=data.get("structured_output"),
-                       session_id=data.get("session_id"), subtype=subtype, error=err, denials=denials)
+                       session_id=data.get("session_id"), subtype=subtype, error=err, denials=denials,
+                       commands=commands)
 
 
 def _usage(role: str, stage: str, attempt: int, data: dict, started: float, outcome: str) -> None:
