@@ -20,7 +20,7 @@ License: BSD (see LICENSE.md for details).
 """
 
 from markdown.test_tools import TestCase
-from markdown import Markdown
+from markdown import Markdown, markdown
 from markdown.extensions.toc import TocExtension, strip_tags, unique
 from markdown.extensions.nl2br import Nl2BrExtension
 
@@ -1493,6 +1493,86 @@ class TestTOC(TestCase):
             },
             extensions=[TocExtension(), 'footnotes']
         )
+
+
+class TestTocNotoc(TestCase):
+    """ Tests for leaving headings with the `notoc` class out of the Table of Contents. """
+
+    def flatten_names(self, tokens):
+        """ Return the `name` of every token, including nested children, in document order. """
+        names = []
+        for token in tokens:
+            names.append(token['name'])
+            names.extend(self.flatten_names(token['children']))
+        return names
+
+    def test_ac_fr_001_1_notoc_heading_omitted_from_toc(self):
+        """ `AC-FR-001-1`: a heading with the `notoc` class is left out of the TOC, the others remain. """
+        html = markdown(
+            '[TOC]\n\n# One\n\n## Two {: .notoc }\n\n## Three',
+            extensions=['toc', 'attr_list']
+        )
+        self.assertIn('href="#three"', html)
+
+    def test_ac_fr_001_2_notoc_heading_absent_from_toc_links(self):
+        """ `AC-FR-001-2`: no TOC link points at a heading with the `notoc` class. """
+        html = markdown(
+            '[TOC]\n\n# One\n\n## Two {: .notoc }\n\n## Three',
+            extensions=['toc', 'attr_list']
+        )
+        self.assertNotIn('href="#two"', html)
+
+    def test_ac_fr_001_3_notoc_token_in_multiple_classes(self):
+        """ `AC-FR-001-3`: `notoc` is excluded when it is one of several classes on the heading. """
+        html = markdown(
+            '[TOC]\n\n# One\n\n## Two {: .other .notoc }\n\n## Three',
+            extensions=['toc', 'attr_list']
+        )
+        self.assertNotIn('href="#two"', html)
+
+    def test_ac_fr_001_4_child_of_notoc_heading_kept(self):
+        """ `AC-FR-001-4`: a heading nested under an excluded heading stays in the TOC. """
+        html = markdown(
+            '[TOC]\n\n# One\n\n## Two {: .notoc }\n\n### Four\n\n## Three',
+            extensions=['toc', 'attr_list']
+        )
+        self.assertIn('href="#four"', html)
+
+    def test_ac_fr_002_1_notoc_heading_absent_from_toc_tokens(self):
+        """ `AC-FR-002-1`: a heading with the `notoc` class is left out of `toc_tokens`. """
+        md = Markdown(extensions=['toc', 'attr_list'])
+        md.convert('[TOC]\n\n# One\n\n## Two {: .notoc }\n\n## Three')
+        self.assertEqual(self.flatten_names(md.toc_tokens), ['One', 'Three'])
+
+    def test_ac_fr_003_1_notoc_heading_keeps_id(self):
+        """ `AC-FR-003-1`: a heading with the `notoc` class keeps its generated `id` attribute. """
+        html = markdown(
+            '[TOC]\n\n# One\n\n## Two {: .notoc }\n\n## Three',
+            extensions=['toc', 'attr_list']
+        )
+        self.assertIn('id="two"', html)
+
+    def test_ac_fr_003_2_notoc_heading_rendered(self):
+        """ `AC-FR-003-2`: a heading with the `notoc` class is still rendered as an `h2` element. """
+        html = markdown(
+            '[TOC]\n\n# One\n\n## Two {: .notoc }\n\n## Three',
+            extensions=['toc', 'attr_list']
+        )
+        self.assertIn('>Two</h2>', html)
+
+    def test_ac_fr_004_1_other_class_heading_kept_in_toc_tokens(self):
+        """ `AC-FR-004-1`: headings with other classes remain in `toc_tokens`. """
+        md = Markdown(extensions=['toc', 'attr_list'])
+        md.convert('# One\n\n## Two {: .other }\n\n## Three')
+        self.assertEqual(self.flatten_names(md.toc_tokens), ['One', 'Two', 'Three'])
+
+    def test_ac_fr_004_2_other_class_heading_kept_in_toc(self):
+        """ `AC-FR-004-2`: headings with other classes remain in the TOC. """
+        html = markdown(
+            '[TOC]\n\n# One\n\n## Two {: .other }\n\n## Three',
+            extensions=['toc', 'attr_list']
+        )
+        self.assertIn('href="#two"', html)
 
 
 class testStripTags(TestCase):
