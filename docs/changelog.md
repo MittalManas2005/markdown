@@ -16,6 +16,9 @@ See the [Contributing Guide](contributing.md) for details.
 
 ### Fixed
 
+* Fix a crash in the `toc` extension when a heading has a valueless `id`
+  attribute from `attr_list`, such as `# Heading {: id }`. The heading now gets
+  the generated id, like a heading without an `id`.
 * Support automatic links with URL schemes other than HTTP and FTP, such as
   `<ssh://example.org>` (#1244).
 * Fix quadratic-time id generation in the `toc` extension when many headers
