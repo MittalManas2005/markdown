@@ -797,6 +797,7 @@ class TestCliOptionParsing(unittest.TestCase):
             'encoding': None,
             'output_format': 'xhtml',
             'lazy_ol': True,
+            'tab_length': 2,
             'extensions': [],
             'extension_configs': {},
         }
@@ -805,6 +806,16 @@ class TestCliOptionParsing(unittest.TestCase):
     def tearDown(self):
         if os.path.isfile(self.tempfile):
             os.remove(self.tempfile)
+
+    def testTabLengthOption(self):
+        options, logging_level = parse_options(['--tab_length', '3'])
+        self.default_options['tab_length'] = 3
+        self.assertEqual(options, self.default_options)
+
+    def testTabLengthOptionEquals(self):
+        options, logging_level = parse_options(['--tab_length=4'])
+        self.default_options['tab_length'] = 4
+        self.assertEqual(options, self.default_options)
 
     def testNoOptions(self):
         options, logging_level = parse_options([])
