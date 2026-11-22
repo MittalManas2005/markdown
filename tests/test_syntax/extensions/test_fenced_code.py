@@ -455,6 +455,70 @@ class TestFencedCode(TestCase):
             extensions=['fenced_code', 'attr_list']
         )
 
+    def test_ac_fr_001_1_linenums_ignored_without_codehilite(self):
+        """AC-FR-001-1: a bare `linenums` is omitted from `<code>` when codehilite is not enabled (issue #4)."""
+        self.assertMarkdownRenders(
+            '``` { .python linenums }\nprint(1)\n```',
+            '<pre><code class="language-python">print(1)\n</code></pre>',
+            extensions=['fenced_code', 'attr_list']
+        )
+
+    def test_ac_fr_001_2_linenums_true_ignored_without_codehilite(self):
+        """AC-FR-001-2: `linenums=true` is omitted from `<code>` when codehilite is not enabled (issue #4)."""
+        self.assertMarkdownRenders(
+            '``` { .python linenums=true }\nprint(1)\n```',
+            '<pre><code class="language-python">print(1)\n</code></pre>',
+            extensions=['fenced_code', 'attr_list']
+        )
+
+    def test_ac_fr_001_3_linenums_quoted_one_ignored_without_codehilite(self):
+        """AC-FR-001-3: `linenums="1"` is omitted from `<code>` when codehilite is not enabled (issue #4)."""
+        self.assertMarkdownRenders(
+            '``` { .python linenums="1" }\nprint(1)\n```',
+            '<pre><code class="language-python">print(1)\n</code></pre>',
+            extensions=['fenced_code', 'attr_list']
+        )
+
+    def test_ac_fr_001_4_guess_lang_ignored_without_codehilite(self):
+        """AC-FR-001-4: `guess_lang` is omitted from `<code>` when codehilite is not enabled (issue #4)."""
+        self.assertMarkdownRenders(
+            '``` { .python guess_lang=False }\nprint(1)\n```',
+            '<pre><code class="language-python">print(1)\n</code></pre>',
+            extensions=['fenced_code', 'attr_list']
+        )
+
+    def test_ac_fr_001_5_noclasses_ignored_without_codehilite(self):
+        """AC-FR-001-5: `noclasses` is omitted from `<code>` when codehilite is not enabled (issue #4)."""
+        self.assertMarkdownRenders(
+            '``` { .python noclasses=True }\nprint(1)\n```',
+            '<pre><code class="language-python">print(1)\n</code></pre>',
+            extensions=['fenced_code', 'attr_list']
+        )
+
+    def test_ac_fr_002_1_hl_lines_ignored_without_codehilite(self):
+        """AC-FR-002-1: `hl_lines` is omitted from `<code>` when codehilite is not enabled (issue #4)."""
+        self.assertMarkdownRenders(
+            '``` { .python hl_lines="1 3" }\nprint(1)\n```',
+            '<pre><code class="language-python">print(1)\n</code></pre>',
+            extensions=['fenced_code', 'attr_list']
+        )
+
+    def test_ac_fr_003_1_other_attributes_kept_without_codehilite(self):
+        """AC-FR-003-1: other attributes stay on `<code>` while highlighting-only options are omitted (issue #4)."""
+        self.assertMarkdownRenders(
+            '``` { .python data-x="y" linenums }\nprint(1)\n```',
+            '<pre><code class="language-python" data-x="y">print(1)\n</code></pre>',
+            extensions=['fenced_code', 'attr_list']
+        )
+
+    def test_ac_fr_004_1_codehilite_highlighting_unchanged(self):
+        """AC-FR-004-1: highlighting with codehilite is still applied to a block with `linenums` (issue #4)."""
+        output = markdown.markdown(
+            '``` { .python linenums=True }\nprint(1)\n```',
+            extensions=['codehilite', 'fenced_code']
+        )
+        self.assertIn('class="codehilite"', output)
+
 
 class TestFencedCodeWithCodehilite(TestCase):
 

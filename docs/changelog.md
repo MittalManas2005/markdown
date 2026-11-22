@@ -16,6 +16,9 @@ See the [Contributing Guide](contributing.md) for details.
 
 ### Fixed
 
+* Fix a `TypeError` in the `fenced_code` extension when `attr_list` is enabled, `codehilite` is not, and a code block
+  sets `linenums`, `guess_lang`, `noclasses` or `hl_lines`. These highlighting-only options are now omitted from the
+  `code` element when highlighting is not applied (#4).
 * Support automatic links with URL schemes other than HTTP and FTP, such as
   `<ssh://example.org>` (#1244).
 * Fix quadratic-time id generation in the `toc` extension when many headers

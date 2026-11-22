@@ -215,6 +215,10 @@ A code block with inline styles. Fancy!
 
 If the `attr_list` extension is not enabled, then the key/value pairs will be ignored.
 
+The `linenums`, `guess_lang`, `noclasses`, `hl_lines` and `use_pygments` key/value pairs only affect syntax
+highlighting. When highlighting is not applied to a code block, they are omitted from the `<code>` tag, and the other
+key/value pairs are still assigned as attributes.
+
 #### Syntax Highlighting
 
 If the `fenced_code` extension and syntax highlighting are both enabled, then the [`codehilite`][codehilite]

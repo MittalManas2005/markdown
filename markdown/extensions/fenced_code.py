@@ -87,6 +87,9 @@ class FencedBlockPreprocessor(Preprocessor):
             'noclasses',
             'use_pygments'
         ]
+        # Options which only affect syntax highlighting. They are never written as attributes on the `code` element
+        # when highlighting is not applied to the block (see `run`).
+        self.highlight_only_options = [*self.bool_options, 'hl_lines']
 
     def run(self, lines: list[str]) -> list[str]:
         """ Match and store Fenced Code Blocks in the `HtmlStash`. """
@@ -156,9 +159,11 @@ class FencedBlockPreprocessor(Preprocessor):
                         # Only assign key/value pairs to code element if `attr_list` extension is enabled, key/value
                         # pairs were defined on the code block, and the `use_pygments` key was not set to `True`. The
                         # `use_pygments` key could be either set to `False` or not defined. It is omitted from output.
+                        # Highlighting-only options (e.g. `linenums`) are parsed to `bool` or None and are omitted too,
+                        # because they have no meaning without highlighting.
                         kv_pairs = ''.join(
                             f' {sanitize_name(k)}="{_escape_attrib_html(v)}"'
-                            for k, v in config.items() if k != 'use_pygments'
+                            for k, v in config.items() if k not in self.highlight_only_options
                         )
                     code = self._escape(m.group('code'))
                     code = f'<pre{id_attr}{class_attr}><code{lang_attr}{kv_pairs}>{code}</code></pre>'
