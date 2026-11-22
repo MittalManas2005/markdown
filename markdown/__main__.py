@@ -65,6 +65,9 @@ def parse_options(args=None, values=None):
     parser.add_option("-o", "--output_format", dest="output_format",
                       default='xhtml', metavar="OUTPUT_FORMAT",
                       help="Use output format 'xhtml' (default) or 'html'.")
+    parser.add_option("-t", "--tab_length", dest="tab_length", type="int",
+                      default=2, metavar="TAB_LENGTH",
+                      help="Number of spaces per indentation level.")
     parser.add_option("-n", "--no_lazy_ol", dest="lazy_ol",
                       action='store_false', default=True,
                       help="Observe number of first item of ordered lists.")
@@ -121,7 +124,8 @@ def parse_options(args=None, values=None):
         'extension_configs': extension_configs,
         'encoding': options.encoding,
         'output_format': options.output_format,
-        'lazy_ol': options.lazy_ol
+        'lazy_ol': options.lazy_ol,
+        'tab_length': options.tab_length
     }
 
     return opts, options.verbose

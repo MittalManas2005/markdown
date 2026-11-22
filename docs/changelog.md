@@ -14,6 +14,10 @@ See the [Contributing Guide](contributing.md) for details.
 
 ## [Unreleased]
 
+### Added
+
+* Add a `--tab_length` option to the command line interface.
+
 ### Fixed
 
 * Support automatic links with URL schemes other than HTTP and FTP, such as
