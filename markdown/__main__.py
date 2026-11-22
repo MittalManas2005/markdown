@@ -68,6 +68,9 @@ def parse_options(args=None, values=None):
     parser.add_option("-n", "--no_lazy_ol", dest="lazy_ol",
                       action='store_false', default=True,
                       help="Observe number of first item of ordered lists.")
+    parser.add_option("--tab_length", dest="tab_length", type="int", default=None,
+                      metavar="TAB_LENGTH",
+                      help="Number of spaces per tab in the source. Defaults to 4.")
     parser.add_option("-x", "--extension", action="append", dest="extensions",
                       help="Load extension EXTENSION.", metavar="EXTENSION")
     parser.add_option("-c", "--extension_configs",
@@ -123,6 +126,9 @@ def parse_options(args=None, values=None):
         'output_format': options.output_format,
         'lazy_ol': options.lazy_ol
     }
+    # Only forward `tab_length` when given, so the library default applies otherwise.
+    if options.tab_length is not None:
+        opts['tab_length'] = options.tab_length
 
     return opts, options.verbose
 

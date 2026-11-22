@@ -27,6 +27,9 @@ Tests of the various APIs with the Python Markdown library.
 import unittest
 import sys
 import os
+import shutil
+import subprocess
+import contextlib
 import markdown
 import warnings
 from markdown.__main__ import parse_options
@@ -854,6 +857,23 @@ class TestCliOptionParsing(unittest.TestCase):
         self.default_options['lazy_ol'] = False
         self.assertEqual(options, self.default_options)
 
+    def testTabLengthOption(self):
+        options, logging_level = parse_options(['--tab_length=2'])
+        self.default_options['tab_length'] = 2
+        self.assertEqual(options, self.default_options)
+
+    def testTabLengthSpaceSeparated(self):
+        options, logging_level = parse_options(['--tab_length', '2'])
+        self.default_options['tab_length'] = 2
+        self.assertEqual(options, self.default_options)
+
+    def testTabLengthInvalid(self):
+        # A non-integer value is a usage error (exit status 2), as for other invalid arguments.
+        with contextlib.redirect_stderr(StringIO()):
+            with self.assertRaises(SystemExit) as cm:
+                parse_options(['--tab_length=abc'])
+        self.assertEqual(cm.exception.code, 2)
+
     def testExtensionOption(self):
         options, logging_level = parse_options(['-x', 'markdown.extensions.footnotes'])
         self.default_options['extensions'] = ['markdown.extensions.footnotes']
@@ -1011,3 +1031,65 @@ Some +test+ and a [+link+](http://test.com)
 
         self.md.reset()
         self.assertEqual(self.md.convert(test), result)
+
+
+class TestCliTabLength(unittest.TestCase):
+    """ Test the `--tab_length` option on the command line. """
+
+    text = "- a\n\n  - b\n"
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    def run_cli(self, args, command=None):
+        """ Run the command line with `text` on standard input and return the completed process. """
+        if command is None:
+            command = [sys.executable, '-m', 'markdown']
+        return subprocess.run(
+            command + args,
+            input=self.text,
+            cwd=self.root,
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            check=False,
+        )
+
+    def wrap(self, html):
+        """ Wrap CLI output in a single element so it can be parsed as XML. """
+        return etree.fromstring('<div>%s</div>' % html)
+
+    def testHelpListsTabLength(self):
+        result = self.run_cli(['--help'])
+        self.assertIn('--tab_length', result.stdout)
+
+    def testTabLengthNests(self):
+        result = self.run_cli(['--tab_length=2'])
+        self.assertEqual(result.returncode, 0)
+        root = self.wrap(result.stdout)
+        self.assertEqual(root.find('./ul/li/ul/li').text, 'b')
+
+    def testTabLengthSyntaxesMatch(self):
+        separated = self.run_cli(['--tab_length', '2'])
+        joined = self.run_cli(['--tab_length=2'])
+        self.assertEqual(separated.returncode, 0)
+        self.assertEqual(separated.stdout, joined.stdout)
+
+    def testTabLengthMatchesLibrary(self):
+        result = self.run_cli(['--tab_length=2'])
+        expected = markdown.markdown(self.text, tab_length=2)
+        self.assertEqual(result.stdout.strip(), expected.strip())
+
+    def testNoTabLengthUnchanged(self):
+        result = self.run_cli([])
+        self.assertEqual(result.returncode, 0)
+        # The input is a loose list, so each item wraps its text in a `<p>`.
+        root = self.wrap(result.stdout)
+        # `b` must be a top-level item, not nested inside the list item for `a`.
+        self.assertIsNone(root.find('./ul/li/ul'))
+        self.assertEqual([''.join(li.itertext()).strip() for li in root.findall('./ul/li')], ['a', 'b'])
+        self.assertEqual(result.stdout.strip(), markdown.markdown(self.text).strip())
+
+    @unittest.skipIf(shutil.which('markdown_py') is None, 'markdown_py is not on PATH')
+    def testMarkdownPyMatchesModule(self):
+        module = self.run_cli(['--tab_length=2'])
+        script = self.run_cli(['--tab_length=2'], command=['markdown_py'])
+        self.assertEqual(script.stdout, module.stdout)

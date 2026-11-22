@@ -14,6 +14,12 @@ See the [Contributing Guide](contributing.md) for details.
 
 ## [Unreleased]
 
+### Added
+
+* Add a `--tab_length` option to the command line (`python -m markdown` and
+  `markdown_py`) to set the length of tabs in the source, as the `tab_length`
+  keyword does in the library (#6).
+
 ### Fixed
 
 * Support automatic links with URL schemes other than HTTP and FTP, such as
