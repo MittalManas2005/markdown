@@ -19,6 +19,7 @@ Copyright 2004 Manfred Stienstra (the original version)
 License: BSD (see LICENSE.md for details).
 """
 
+import markdown
 from markdown.test_tools import TestCase
 from markdown import Markdown
 from markdown.extensions.toc import TocExtension, strip_tags, unique
@@ -201,6 +202,83 @@ class TestTOC(TestCase):
             },
             extensions=[TocExtension(), 'attr_list']
         )
+
+    def testValuelessCustomLabelAttribute(self):
+        self.assertMarkdownRenders(
+            '## Setup {: data-toc-label }',
+            '<h2 id="setup">Setup</h2>',
+            expected_attrs={
+                'toc': (
+                    '<div class="toc">\n<ul>\n'
+                    '<li><a href="#setup">Setup</a></li>\n'
+                    '</ul>\n</div>\n'
+                ),
+                'toc_tokens': [{
+                    'level': 2,
+                    'id': 'setup',
+                    'name': 'Setup',
+                    'html': 'Setup',
+                    'data-toc-label': '',
+                    'children': []
+                }]
+            },
+            extensions=[TocExtension(), 'attr_list']
+        )
+
+    def testCustomLabelAttributeWithValue(self):
+        self.assertMarkdownRenders(
+            "## Setup { data-toc-label='Custom' }",
+            '<h2 id="setup">Setup</h2>',
+            expected_attrs={
+                'toc_tokens': [{
+                    'level': 2,
+                    'id': 'setup',
+                    'name': 'Custom',
+                    'html': 'Setup',
+                    'data-toc-label': 'Custom',
+                    'children': []
+                }]
+            },
+            extensions=[TocExtension(), 'attr_list']
+        )
+
+    def test_ac_fr_001_1_valueless_label_no_error(self):
+        """`AC-FR-001-1`: a `data-toc-label` with no value raises no exception and gives HTML."""
+        output = markdown.markdown('## Setup {: data-toc-label }', extensions=['toc', 'attr_list'])
+        self.assertIsInstance(output, str)
+        self.assertIn('<h2 id="setup">', output)
+
+    def test_ac_fr_001_2_valueless_label_toc_name_is_heading_text(self):
+        """`AC-FR-001-2`: the `toc` entry for a `data-toc-label` with no value is named after the heading."""
+        md = Markdown(extensions=['toc', 'attr_list'])
+        md.convert('## Setup {: data-toc-label }')
+        self.assertEqual(len(md.toc_tokens), 1)
+        self.assertEqual(md.toc_tokens[0]['name'], 'Setup')
+
+    def test_ac_fr_001_3_valueless_label_header_markup(self):
+        """`AC-FR-001-3`: a `data-toc-label` with no value leaves the header markup unchanged."""
+        output = markdown.markdown('## Setup {: data-toc-label }', extensions=['toc', 'attr_list'])
+        self.assertIn('<h2 id="setup">Setup</h2>', output)
+
+    def test_ac_fr_001_4_valueless_label_toc_links_to_heading(self):
+        """`AC-FR-001-4`: the `toc` marker links to the heading ID when the label has no value."""
+        output = markdown.markdown(
+            '[TOC]\n\n## Setup {: data-toc-label }',
+            extensions=['toc', 'attr_list']
+        )
+        self.assertIn('href="#setup"', output)
+
+    def test_ac_fr_002_1_non_empty_label_toc_name_preserved(self):
+        """`AC-FR-002-1`: a non-empty `data-toc-label` is used as the TOC entry name."""
+        md = Markdown(extensions=['toc', 'attr_list'])
+        md.convert("## Setup { data-toc-label='Custom' }")
+        self.assertEqual(len(md.toc_tokens), 1)
+        self.assertEqual(md.toc_tokens[0]['name'], 'Custom')
+
+    def test_ac_fr_002_2_non_empty_label_header_id_preserved(self):
+        """`AC-FR-002-2`: a non-empty `data-toc-label` keeps the ID derived from the heading text."""
+        output = markdown.markdown("## Setup { data-toc-label='Custom' }", extensions=['toc', 'attr_list'])
+        self.assertIn('<h2 id="setup">Setup</h2>', output)
 
     def testUniqueIds(self):
         self.assertMarkdownRenders(

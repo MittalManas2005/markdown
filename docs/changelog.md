@@ -39,6 +39,9 @@ See the [Contributing Guide](contributing.md) for details.
   provided, rather than rendering them as `key="key"`, so the same source
   renders consistently under both the `html` and `xhtml` output formats
   (#1501).
+* Ignore a valueless `data-toc-label` attribute in the `toc` extension when
+  `attr_list` is enabled, so the Table of Contents entry uses the heading text
+  instead of raising `TypeError`.
 
 ## [3.11.2] - 2026-10-19
 
