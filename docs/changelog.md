@@ -14,6 +14,11 @@ See the [Contributing Guide](contributing.md) for details.
 
 ## [Unreleased]
 
+### Added
+
+* Headings with the `notoc` class (for example `## Heading {: .notoc }` with
+  `attr_list`) are left out of the table of contents.
+
 ### Fixed
 
 * Support automatic links with URL schemes other than HTTP and FTP, such as

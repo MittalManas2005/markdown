@@ -402,6 +402,9 @@ class TocTreeprocessor(Treeprocessor):
                 # Do not override pre-existing ids
                 if "id" not in el.attrib:
                     el.attrib["id"] = unique(self.slugify(html.unescape(name), self.sep), used_ids, id_counters)
+                else:
+                    # Normalize ids set with `attr_list` so that every TOC link is a valid anchor.
+                    el.attrib["id"] = self.slugify(html.unescape(el.attrib["id"]), self.sep)
 
                 data_toc_label = ''
                 if 'data-toc-label' in el.attrib:
@@ -411,7 +414,8 @@ class TocTreeprocessor(Treeprocessor):
                     # Remove the data-toc-label attribute as it is no longer needed
                     del el.attrib['data-toc-label']
 
-                if int(el.tag[-1]) >= self.toc_top and int(el.tag[-1]) <= self.toc_bottom:
+                excluded = 'notoc' in (el.attrib.get('class') or '').split()
+                if not excluded and int(el.tag[-1]) >= self.toc_top and int(el.tag[-1]) <= self.toc_bottom:
                     toc_tokens.append({
                         'level': int(el.tag[-1]),
                         'id': unescape(el.attrib["id"]),
