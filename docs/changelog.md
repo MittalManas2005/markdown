@@ -16,6 +16,9 @@ See the [Contributing Guide](contributing.md) for details.
 
 ### Fixed
 
+* Fix a crash in the `toc` extension when a heading has a `data-toc-label`
+  attribute with no value and `attr_list` is enabled. The empty label is now
+  ignored, so the heading text is used in the table of contents.
 * Support automatic links with URL schemes other than HTTP and FTP, such as
   `<ssh://example.org>` (#1244).
 * Fix quadratic-time id generation in the `toc` extension when many headers

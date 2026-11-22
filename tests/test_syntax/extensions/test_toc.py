@@ -19,6 +19,7 @@ Copyright 2004 Manfred Stienstra (the original version)
 License: BSD (see LICENSE.md for details).
 """
 
+import markdown
 from markdown.test_tools import TestCase
 from markdown import Markdown
 from markdown.extensions.toc import TocExtension, strip_tags, unique
@@ -201,6 +202,52 @@ class TestTOC(TestCase):
             },
             extensions=[TocExtension(), 'attr_list']
         )
+
+    def testValuelessTocLabelIgnored(self):
+        md = Markdown(extensions=[TocExtension(), 'attr_list'])
+        html = md.convert('# Heading {: data-toc-label }')
+        self.assertEqual(html, '<h1 id="heading">Heading</h1>')
+        self.assertNotIn('data-toc-label', html)
+        self.assertIn('<li><a href="#heading">Heading</a></li>', md.toc)
+
+        md = Markdown(extensions=[TocExtension(), 'attr_list'])
+        md.convert('# Heading {: data-toc-label="Short" }')
+        self.assertIn('<li><a href="#heading">Short</a></li>', md.toc)
+
+    def test_ac_fr_001_1_valueless_toc_label_no_exception(self):
+        """AC-FR-001-1: Given `# Heading {: data-toc-label }` with extensions `["toc", "attr_list"]`,
+        when converted through `markdown.markdown`, then no exception is raised and HTML is returned."""
+        html = markdown.markdown('# Heading {: data-toc-label }', extensions=['toc', 'attr_list'])
+        self.assertIsInstance(html, str)
+        self.assertNotEqual(html, '')
+
+    def test_ac_fr_002_1_valueless_toc_label_heading_output(self):
+        """AC-FR-002-1: Given `# Heading {: data-toc-label }` with extensions `["toc", "attr_list"]`,
+        when converted through `markdown.markdown`, then the output contains `<h1 id="heading">Heading</h1>`."""
+        html = markdown.markdown('# Heading {: data-toc-label }', extensions=['toc', 'attr_list'])
+        self.assertIn('<h1 id="heading">Heading</h1>', html)
+
+    def test_ac_fr_002_2_valueless_toc_label_toc_entry_uses_heading_text(self):
+        """AC-FR-002-2: Given `# Heading {: data-toc-label }` with extensions `["toc", "attr_list"]`,
+        when converted with a `Markdown` instance and its `toc` attribute is read, then the `toc` output
+        contains `<li><a href="#heading">Heading</a></li>`."""
+        md = Markdown(extensions=['toc', 'attr_list'])
+        md.convert('# Heading {: data-toc-label }')
+        self.assertIn('<li><a href="#heading">Heading</a></li>', md.toc)
+
+    def test_ac_fr_002_3_valueless_toc_label_attribute_not_in_output(self):
+        """AC-FR-002-3: Given `# Heading {: data-toc-label }` with extensions `["toc", "attr_list"]`,
+        when converted through `markdown.markdown`, then the output does not contain `data-toc-label`."""
+        html = markdown.markdown('# Heading {: data-toc-label }', extensions=['toc', 'attr_list'])
+        self.assertNotIn('data-toc-label', html)
+
+    def test_ac_fr_002_4_valued_toc_label_preserved(self):
+        """AC-FR-002-4: Given `# Heading {: data-toc-label="Short" }` with extensions `["toc", "attr_list"]`,
+        when converted with a `Markdown` instance and its `toc` attribute is read, then the `toc` output
+        contains `<li><a href="#heading">Short</a></li>`."""
+        md = Markdown(extensions=['toc', 'attr_list'])
+        md.convert('# Heading {: data-toc-label="Short" }')
+        self.assertIn('<li><a href="#heading">Short</a></li>', md.toc)
 
     def testUniqueIds(self):
         self.assertMarkdownRenders(
