@@ -1085,6 +1085,46 @@ class TestTOC(TestCase):
             extensions=['toc', 'attr_list']
         )
 
+    def test_ac_fr_001_1_valueless_id_on_heading(self):
+        # `AC-FR-001-1`: a valueless `{: id }` on a heading must not crash and gets the generated id.
+        self.assertMarkdownRenders(
+            '# Heading {: id }',
+            '<h1 id="heading">Heading</h1>',
+            extensions=['toc', 'attr_list']
+        )
+
+    def test_ac_fr_001_2_empty_string_id_on_heading(self):
+        # `AC-FR-001-2`: an explicit empty `id=""` on a heading is treated as missing and gets the generated id.
+        self.assertMarkdownRenders(
+            '# Heading {: id="" }',
+            '<h1 id="heading">Heading</h1>',
+            extensions=['toc', 'attr_list']
+        )
+
+    def test_ac_fr_002_1_empty_id_heading_listed_in_toc(self):
+        # `AC-FR-002-1`: a heading with an empty `id` appears in the table of contents.
+        output = Markdown(extensions=['toc', 'attr_list']).convert('[TOC]\n\n# Heading {: id }')
+        self.assertIn('<a href="#heading">Heading</a>', output)
+
+    def test_ac_fr_002_2_empty_id_heading_unique_generated_id(self):
+        # `AC-FR-002-2`: the generated id of an empty-id heading does not collide with another heading's id.
+        output = Markdown(extensions=['toc', 'attr_list']).convert('# Heading {: id }\n\n# Heading')
+        self.assertIn('<h1 id="heading">Heading</h1>', output)
+        self.assertIn('<h1 id="heading_1">Heading</h1>', output)
+
+    def test_ac_fr_003_1_explicit_id_preserved_with_toc(self):
+        # `AC-FR-003-1` (preservation): an explicit non-empty id is kept when `toc` is enabled.
+        self.assertMarkdownRenders(
+            '# Heading {: id="intro" }',
+            '<h1 id="intro">Heading</h1>',
+            extensions=['toc', 'attr_list']
+        )
+
+    def test_ac_fr_003_2_valueless_id_without_toc_unchanged(self):
+        # `AC-FR-003-2` (preservation): without `toc`, a valueless id is still rendered as a bare attribute.
+        output = Markdown(extensions=['attr_list']).convert('# Heading {: id }')
+        self.assertIn('<h1 id>Heading</h1>', output)
+
     def testAutoLinkEmail(self):
         self.assertMarkdownRenders(
             '## <foo@example.org>',
