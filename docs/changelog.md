@@ -16,6 +16,9 @@ See the [Contributing Guide](contributing.md) for details.
 
 ### Fixed
 
+* Ignore the `linenums`, `guess_lang` and `noclasses` options on fenced code blocks
+  when the `codehilite` extension is not enabled, instead of raising an error when
+  `attr_list` is also enabled (#4).
 * Support automatic links with URL schemes other than HTTP and FTP, such as
   `<ssh://example.org>` (#1244).
 * Fix quadratic-time id generation in the `toc` extension when many headers
