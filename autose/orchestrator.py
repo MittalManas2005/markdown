@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 from . import checks, config
-from .claude_runner import run_agent
+from .claude_runner import AgentEnvironmentError, run_agent
 from .common import RunState, gh_output, git_exclude, log, out_path, run
 
 REPO = Path(".").resolve()
@@ -305,6 +305,8 @@ def main(argv: list[str] | None = None) -> int:
         build.finish_ok()
     except Stop as stop:
         build.finish_stop(stop)
+    except AgentEnvironmentError as env_err:  # stop at once: retrying cannot fix a broken runner
+        build.finish_stop(Stop(int(env_err.stage.split("-")[0]), "failed", str(env_err)))
     return 0
 
 

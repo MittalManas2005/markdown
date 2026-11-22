@@ -54,6 +54,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e '.[testing]' flake8
           npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+      - name: Sandbox for agent commands (bubblewrap + socat), self-tested before any model call (ADR-012)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq bubblewrap socat
+          # Ubuntu 24.04 blocks unprivileged user namespaces through AppArmor; bubblewrap needs them.
+          if [ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+          bwrap --ro-bind / / --dev /dev --proc /proc --unshare-user --unshare-net /bin/true
+          echo "sandbox self-test: ok"
       - name: Fetch the issue into a file (untrusted text never reaches a shell command)
         env:
           GH_TOKEN: ${{ github.token }}
@@ -206,6 +216,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e '.[testing]'
           npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+      - name: Sandbox for agent commands (bubblewrap + socat), self-tested before any model call (ADR-012)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq bubblewrap socat
+          # Ubuntu 24.04 blocks unprivileged user namespaces through AppArmor; bubblewrap needs them.
+          if [ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+          bwrap --ro-bind / / --dev /dev --proc /proc --unshare-user --unshare-net /bin/true
+          echo "sandbox self-test: ok"
       - id: rev
         env:
           GH_TOKEN: ${{ github.token }}

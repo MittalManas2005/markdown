@@ -12,7 +12,7 @@ import re
 import sys
 from pathlib import Path
 
-from .claude_runner import run_agent
+from .claude_runner import AgentEnvironmentError, AgentResult, run_agent
 from .common import gh_output, git_exclude, log, run
 
 OUT = Path(os.environ.get("AUTOSE_OUT", ".autose_review"))
@@ -141,7 +141,11 @@ def main(argv: list[str] | None = None) -> int:
 
     prompt = (f"Review pull request #{a.pr} for issue #{issue}. The issue is in .autose_review/issue.md and the "
               "diff in .autose_review/diff.patch; the repository at the PR head is the current directory.")
-    res = run_agent("reviewer", prompt, stage="6-review", attempt=a.round, json_schema=VERDICT_SCHEMA)
+    try:
+        res = run_agent("reviewer", prompt, stage="6-review", attempt=a.round, json_schema=VERDICT_SCHEMA)
+    except AgentEnvironmentError as env_err:  # never turn a broken runner into "request changes"
+        log(str(env_err))
+        res = AgentResult(ok=False, error=str(env_err), commands=env_err.commands)
     verdict = res.structured
     errors = validate(verdict, res.commands) if res.ok else [res.error or "reviewer failed"]
     if errors:

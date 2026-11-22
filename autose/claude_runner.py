@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import time
@@ -31,6 +32,28 @@ class AgentResult:
     error: str = ""
     denials: list = field(default_factory=list)
     commands: list | None = None  # Bash commands the agent ran, read from its transcript (None: no transcript)
+
+
+# Claude Code's own messages when its command sandbox cannot start (needed for credential scrubbing, ADR-012).
+SANDBOX_FAILURE = re.compile(r"sandbox is required but failed|sandbox dependencies not available|"
+                             r"sandbox is enabled but|sandbox cannot (run|start)", re.IGNORECASE)
+
+
+class AgentEnvironmentError(RuntimeError):
+    """The agent could not work because of the runner environment, not because of the code or the task."""
+
+    def __init__(self, role: str, stage: str, detail: str, commands: list | None = None):
+        super().__init__(f"agent {role}: its shell commands could not start because the command sandbox is "
+                         f"unavailable (environment problem, not a code defect): {detail}")
+        self.role, self.stage, self.commands = role, stage, commands
+
+
+def environment_failure(commands: list[dict] | None) -> str:
+    """The sandbox error text if any command failed because the sandbox could not start, else ''."""
+    for c in commands or []:
+        if not c["ok"] and SANDBOX_FAILURE.search(c["output_tail"]):
+            return " ".join(c["output_tail"].split())[-300:]
+    return ""
 
 
 def find_transcript(session_id: str | None) -> Path | None:
@@ -129,6 +152,9 @@ def run_agent(role: str, prompt: str, *, stage: str, attempt: int, cwd: str = ".
         out_path("logs", f"{stage}-{role}-{attempt}.commands.json").write_text(json.dumps(commands, indent=2))
         ran = sum(1 for c in commands if not c["denied"])
         log(f"agent {role}: {ran} shell command(s) ran, {len(commands) - ran} denied (from the session transcript)")
+        broken = environment_failure(commands)
+        if broken:
+            raise AgentEnvironmentError(role, stage, broken, commands)
     else:
         log(f"agent {role}: no session transcript found; executed commands cannot be verified")
     return AgentResult(ok=ok, text=data.get("result") or "", structured=data.get("structured_output"),
