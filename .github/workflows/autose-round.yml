@@ -183,11 +183,21 @@ jobs:
       PR: ${{ inputs.review_only && inputs.pr || needs.release.outputs.pr }}
       AUTOSE_OUT: .autose_review
     steps:
-      - uses: actions/checkout@v4
+      - name: The code under review (PR head)
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           persist-credentials: false
           ref: refs/pull/${{ inputs.review_only && inputs.pr || needs.release.outputs.pr }}/head
+      - name: AutoSE's own code from the trusted base commit, never from the branch under review (ADR-012)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.base_sha }}
+          path: .autose_trusted
+          persist-credentials: false
+          sparse-checkout: autose
+      - name: Move the trusted copy out of the reviewed checkout
+        run: mv .autose_trusted "$RUNNER_TEMP/autose_trusted"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -203,7 +213,8 @@ jobs:
           AUTOSE_REVIEWER_MODEL: ${{ inputs.reviewer_model }}
           ISSUE: ${{ inputs.issue }}
           ROUND: ${{ inputs.round }}
-        run: python -m autose.review --pr "$PR" --issue "$ISSUE" --round "$ROUND"
+        # -P: never import from the current directory (the PR checkout); AutoSE comes from the trusted copy only
+        run: PYTHONPATH="$RUNNER_TEMP/autose_trusted" python -P -m autose.review --pr "$PR" --issue "$ISSUE" --round "$ROUND"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

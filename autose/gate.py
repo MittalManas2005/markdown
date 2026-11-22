@@ -32,6 +32,16 @@ def has_write(repo: str, login: str) -> bool:
     return perm in ALLOWED_PERMISSION
 
 
+def same_repo_pr(repo: str, pr: str) -> bool:
+    """Review only PRs whose branch lives in this repository: only maintainers and the App can push there.
+
+    A PR from another fork could change packaging files that `pip install` runs in the review job."""
+    data = gh_json(["api", f"repos/{repo}/pulls/{pr}"]) or {}
+    head_repo = ((data.get("head") or {}).get("repo") or {}).get("full_name", "")
+    log(f"PR #{pr} head repository: {head_repo or 'unknown'}")
+    return head_repo == repo
+
+
 def last_status(repo: str, issue: str) -> dict:
     comments = gh_json(["api", "--paginate", f"repos/{repo}/issues/{issue}/comments"]) or []
     for c in reversed(comments):
@@ -57,6 +67,9 @@ def decide(event_name: str, event: dict, repo: str, sha: str) -> dict:
             d["reason"] = "workflow_dispatch: number must be an issue or PR number"
             return d
         mode = inp.get("mode", "full")
+        if mode == "review-only" and not same_repo_pr(repo, num):
+            d["reason"] = f"PR #{num} is not a branch of {repo}; AutoSE reviews only branches in this repository"
+            return d
         d.update(run="true", mode=mode, variant=inp.get("variant", "pipeline"),
                  reviewer_model=inp.get("reviewer_model", "sonnet"))
         d["pr" if mode == "review-only" else "issue"] = num
@@ -86,6 +99,9 @@ def decide(event_name: str, event: dict, repo: str, sha: str) -> dict:
             d["reason"] = f"{user.get('login')} is not allowed to run AutoSE"
             return d
         if "pull_request" in issue:  # GitHub includes this key only when the comment is on a PR
+            if not same_repo_pr(repo, number):
+                d["reason"] = f"PR #{number} is not a branch of {repo}; AutoSE reviews only branches in this repository"
+                return d
             d.update(run="true", mode="review-only", pr=number, reason=f"/autose on PR by {user.get('login')}")
             return d
         status = last_status(repo, number)
