@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import ast
+import os
 import re
 import shutil
 import tempfile
@@ -12,8 +13,12 @@ from . import config
 from .common import clean_env, parse_front_matter, run, tail
 
 ORACLES = ("exact", "contains", "not-contains", "no-error", "raises", "property")
+# A preservation AC may carry the tag inside or after the oracle brackets: "(contains, preservation)" or
+# "(contains) (preservation)". Run 45008926010 stopped at stage 1 over exactly this form (the skill's examples
+# and this pattern disagreed); the testability rule itself (ID, label, oracle kind, Given/when/then) is unchanged.
 AC_LINE = re.compile(
-    r"(AC-(?:FR|NFR|CON)-\d{3}-\d+)\s*\[(Confirmed|Inferred)\]\s*\((" + "|".join(ORACLES) + r")\)\s*:?(.*)",
+    r"(AC-(?:FR|NFR|CON)-\d{3}-\d+)\s*\[(Confirmed|Inferred)\]\s*\((" + "|".join(ORACLES) + r")"
+    r"(?:\s*,\s*preservation)?\)\s*(?:\(preservation\)\s*)?:?(.*)",
     re.I)
 
 
@@ -208,6 +213,60 @@ def check_build(repo: Path) -> Check:
         if proc.returncode != 0:
             reasons.append(f"{name} failed:\n{logs[name]}")
     return Check(not reasons, reasons, {"logs": logs})
+
+
+# ---------------------------------------------------------------- spelling (mirrors CI's `checkspelling` job)
+# Baseline runs 45008881976, 45008918900 and 45008931950 passed every test but failed CI's spell check on test
+# docstrings ("attr", "NFR", "stdin"). The repository's own pyspelling tasks are run on the changed files, and
+# only words that the change introduces are reported (the Markdown task flags some words already in `main`,
+# because CI checks the rendered HTML instead).
+SPELL_TASKS = {".py": "python", ".md": "markdown"}
+
+
+def _misspelled(repo: Path, task: str, path: str) -> set[str]:
+    proc = run(["python", "-m", "pyspelling", "-c", ".pyspelling.yml", "-n", task, "-S", path],
+               cwd=repo, env=clean_env(), timeout=300)
+    words, inside = set(), False
+    for line in (proc.stdout or "").splitlines():
+        if line.startswith("-" * 20):
+            inside = not inside
+        elif inside and line.strip() and " " not in line.strip():
+            words.add(line.strip())
+    return words
+
+
+def spelling_available(repo: Path) -> bool:
+    return (shutil.which("aspell") is not None and (repo / ".pyspelling.yml").exists()
+            and run(["python", "-m", "pyspelling", "--version"], cwd=repo, env=clean_env()).returncode == 0)
+
+
+def check_spelling(repo: Path, base: str, paths: list[str]) -> Check:
+    targets = [p for p in paths if Path(p).suffix in SPELL_TASKS and (repo / p).is_file()]
+    if not targets:
+        return Check(True, [], {"spelling": "no files to check"})
+    if not spelling_available(repo):
+        if os.environ.get("AUTOSE_REQUIRE_SPELLING") == "1":
+            return Check(False, ["the spell checker (pyspelling + aspell) is not installed on this runner"])
+        return Check(True, [], {"spelling": "skipped: pyspelling or aspell not installed"})
+    reasons, found = [], {}
+    with tempfile.TemporaryDirectory(prefix="autose-spell-") as tmp:
+        for rel in targets:
+            task = SPELL_TASKS[Path(rel).suffix]
+            now = _misspelled(repo, task, rel)
+            before: set[str] = set()
+            old = run(["git", "show", f"{base}:{rel}"], cwd=repo)
+            if old.returncode == 0 and now:
+                copy = Path(tmp) / rel
+                copy.parent.mkdir(parents=True, exist_ok=True)
+                copy.write_text(old.stdout)
+                before = _misspelled(repo, task, str(copy))
+            new = sorted(now - before)
+            if new:
+                found[rel] = new
+                reasons.append(f"{rel}: new words rejected by the repository's spell check (CI job `checkspelling`): "
+                               f"{', '.join(new)}. CI spell-checks docstrings, comments and documentation: put "
+                               "identifiers, code and IDs in backticks, or use plain English words.")
+    return Check(not reasons, reasons, {"misspelled": found})
 
 
 # ---------------------------------------------------------------- stage 4: tests

@@ -12,6 +12,9 @@ Output:
 - `status` must follow the stage gate in skill §8.5.
 - Every acceptance criterion must be written on one line as:
   `- AC-FR-001-1 [Inferred] (contains): Given <input and extensions>, when <public call>, then <observable result>.`
+  The bracket after the label holds exactly one oracle kind from skill §4.5. Mark a preservation AC by adding `(preservation)` after it:
+  `- AC-FR-002-1 [Inferred] (contains) (preservation): Given ..., when ..., then ...`
+  Do not put backticks around the ID or the label.
 - `ac_ids` in the front matter must list every acceptance-criterion ID exactly as written in the body.
 
 Do not design the solution and do not name internal functions to change. That is the Design agent's job.

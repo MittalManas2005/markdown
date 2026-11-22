@@ -140,8 +140,10 @@ class Build:
                 changes = checks.changed_files(REPO, self.args.base_sha)
                 guard = checks.diff_guard(REPO, self.args.base_sha, changes)
                 build = checks.check_build(REPO) if guard.ok else checks.Check(False, ["skipped: diff guard failed"])
-                ok3 = guard.ok and build.ok
-                reasons3 = guard.reasons + ([] if build.ok else build.reasons)
+                spell3 = checks.check_spelling(REPO, self.args.base_sha, [
+                    p for s, p in changes if s != "D" and p.startswith(("markdown/", "docs/"))])
+                ok3 = guard.ok and build.ok and spell3.ok
+                reasons3 = guard.reasons + ([] if build.ok else build.reasons) + spell3.reasons
                 self.state.check(3, "code builds (guard + compile + flake8)", ok3, reasons3)
                 checks.write_patch(REPO, self.args.base_sha, self.out / "diff.patch")
                 self.write_stage3_report(changes, ok3, reasons3)
@@ -156,8 +158,10 @@ class Build:
                           stage="4-testing", attempt=attempt)
             chk = checks.check_tests(REPO, self.args.base_sha, self.ac_ids, self.base_count)
             lint = checks.check_build(REPO)  # the new tests must also satisfy flake8
-            ok4 = chk.ok and lint.ok
-            reasons4 = chk.reasons + ([] if lint.ok else lint.reasons)
+            spell4 = checks.check_spelling(REPO, self.args.base_sha, [
+                p for s, p in checks.changed_files(REPO, self.args.base_sha) if s != "D" and p.startswith("tests/")])
+            ok4 = chk.ok and lint.ok and spell4.ok
+            reasons4 = chk.reasons + ([] if lint.ok else lint.reasons) + spell4.reasons
             self.state.check(4, "new and existing tests pass", ok4, reasons4)
             checks.write_patch(REPO, self.args.base_sha, self.out / "diff.patch")
             self.write_test_report(chk, ok4, reasons4)
@@ -165,10 +169,10 @@ class Build:
                 self.state.transition("testing", "release", "all new and existing tests pass")
                 return True, ""
             last = "Stage 4 check failed:\n" + "\n".join(reasons4)
-            if chk.kind in ("coverage", "vacuous"):
+            if chk.kind in ("coverage", "vacuous") or (chk.ok and lint.ok and not spell4.ok):
                 write_feedback("test_feedback.md", "Your tests failed the pipeline's check", reasons4)
                 run_implementer, run_tester = False, True
-                self.state.transition("testing", "testing", f"{chk.kind}: tester retries")
+                self.state.transition("testing", "testing", f"{chk.kind or 'spelling'}: tester retries")
             else:
                 write_feedback("impl_feedback.md", "Tests fail with your implementation", reasons4)
                 run_implementer, run_tester = True, False
@@ -258,11 +262,16 @@ class Build:
             changes = checks.changed_files(REPO, self.args.base_sha)
             guard = checks.diff_guard(REPO, self.args.base_sha, changes)
             build = checks.check_build(REPO) if guard.ok else checks.Check(False, ["skipped: diff guard failed"])
-            ok3 = guard.ok and build.ok
-            self.state.check(3, "code builds", ok3, guard.reasons + build.reasons)
-            self.write_stage3_report(changes, ok3, guard.reasons + ([] if build.ok else build.reasons))
+            # Same spelling rule as the pipeline (stage 3 for code and docs, stage 4 for tests), applied at once
+            # because the single agent writes code, docs and tests in one go.
+            spell = checks.check_spelling(REPO, self.args.base_sha, [
+                p for s, p in changes if s != "D" and p.startswith(("markdown/", "docs/", "tests/"))])
+            ok3 = guard.ok and build.ok and spell.ok
+            reasons3 = guard.reasons + ([] if build.ok else build.reasons) + spell.reasons
+            self.state.check(3, "code builds", ok3, reasons3)
+            self.write_stage3_report(changes, ok3, reasons3)
             if not ok3:
-                feedback = guard.reasons + build.reasons
+                feedback = reasons3
                 continue
             chk4 = checks.check_tests(REPO, self.args.base_sha, self.ac_ids, self.base_count)
             self.state.check(4, "new and existing tests pass", chk4.ok, chk4.reasons)

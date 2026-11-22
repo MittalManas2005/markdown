@@ -46,18 +46,21 @@ jobs:
           persist-credentials: false
           # rounds 2-3 continue from the PR branch; round 1 starts from the base commit
           ref: ${{ inputs.round > 1 && format('autose/issue-{0}{1}', inputs.issue, inputs.variant == 'single' && '-single' || '') || inputs.base_sha }}
+      - name: Hide other branches from the agents (other runs' fixes, seeded PRs)
+        # fetch-depth 0 downloads every branch; removing the remote deletes those refs. Agents are also denied git.
+        run: git remote remove origin
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"        # same interpreter as upstream's flake8 job
       - name: Install the repository, flake8 and Claude Code
         run: |
           python -m pip install --upgrade pip
-          pip install -e '.[testing]' flake8
+          pip install -e '.[testing]' flake8 pyspelling
           npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
       - name: Sandbox for agent commands (bubblewrap + socat), self-tested before any model call (ADR-012)
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq bubblewrap socat
+          sudo apt-get install -y -qq bubblewrap socat aspell aspell-en
           # Ubuntu 24.04 blocks unprivileged user namespaces through AppArmor; bubblewrap needs them.
           if [ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
             sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
@@ -113,6 +116,7 @@ jobs:
       - name: Orchestrator (stages 1-4)
         id: orch
         env:
+          AUTOSE_REQUIRE_SPELLING: "1"     # the spell check must run, never silently skip
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           ISSUE: ${{ inputs.issue }}
           ROUND: ${{ inputs.round }}
@@ -214,12 +218,12 @@ jobs:
       - name: Install the repository, flake8 and Claude Code
         run: |
           python -m pip install --upgrade pip
-          pip install -e '.[testing]' flake8
+          pip install -e '.[testing]' flake8 pyspelling
           npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
       - name: Sandbox for agent commands (bubblewrap + socat), self-tested before any model call (ADR-012)
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq bubblewrap socat
+          sudo apt-get install -y -qq bubblewrap socat aspell aspell-en
           # Ubuntu 24.04 blocks unprivileged user namespaces through AppArmor; bubblewrap needs them.
           if [ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
             sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
