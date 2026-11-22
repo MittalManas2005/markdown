@@ -129,6 +129,30 @@ The value of the `data-toc-label` attribute is sanitized and stripped of any HTM
 tags. However, `toc_tokens` will contain the raw content under
 `data-toc-label`.
 
+### Excluding Headings
+
+In conjunction with the [Attribute Lists Extension], a heading with the `notoc`
+class is left out of the Table of Contents and out of `toc_tokens`. This is useful
+for headings such as "Changelog" or "See also" that should not appear in the
+Table of Contents. For example:
+
+``` md-render
+---
+extensions: [toc, attr_list]
+---
+[TOC]
+
+# One
+
+## Two { .notoc }
+
+## Three
+```
+
+The heading itself is rendered as usual, including its `id`, so links to it
+keep working. Headings with other classes are not affected. Headings nested under
+an excluded heading remain in the Table of Contents.
+
 Usage
 -----
 
