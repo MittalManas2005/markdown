@@ -304,6 +304,150 @@ class TestFencedCode(TestCase):
             extensions=['fenced_code', 'attr_list']
         )
 
+    def testFencedLanguageLinenumsFlagNoCodehiliteWithAttrList(self):
+        self.assertMarkdownRenders(
+            self.dedent(
+                '''
+                ``` { .python linenums }
+                print(1)
+                ```
+                '''
+            ),
+            self.dedent(
+                '''
+                <pre><code class="language-python">print(1)
+                </code></pre>
+                '''
+            ),
+            extensions=['fenced_code', 'attr_list']
+        )
+
+    def testFencedLanguageLinenumsTrueNoCodehiliteWithAttrList(self):
+        self.assertMarkdownRenders(
+            self.dedent(
+                '''
+                ``` { .python linenums=true }
+                print(1)
+                ```
+                '''
+            ),
+            self.dedent(
+                '''
+                <pre><code class="language-python">print(1)
+                </code></pre>
+                '''
+            ),
+            extensions=['fenced_code', 'attr_list']
+        )
+
+    def testFencedLanguageLinenumsQuotedNoCodehiliteWithAttrList(self):
+        self.assertMarkdownRenders(
+            self.dedent(
+                '''
+                ``` { .python linenums="1" }
+                print(1)
+                ```
+                '''
+            ),
+            self.dedent(
+                '''
+                <pre><code class="language-python">print(1)
+                </code></pre>
+                '''
+            ),
+            extensions=['fenced_code', 'attr_list']
+        )
+
+    def testFencedLanguageGuesslangNoCodehiliteWithAttrList(self):
+        self.assertMarkdownRenders(
+            self.dedent(
+                '''
+                ``` { .python guess_lang }
+                print(1)
+                ```
+                '''
+            ),
+            self.dedent(
+                '''
+                <pre><code class="language-python">print(1)
+                </code></pre>
+                '''
+            ),
+            extensions=['fenced_code', 'attr_list']
+        )
+
+    def testFencedLanguageNoclassesNoCodehiliteWithAttrList(self):
+        self.assertMarkdownRenders(
+            self.dedent(
+                '''
+                ``` { .python noclasses }
+                print(1)
+                ```
+                '''
+            ),
+            self.dedent(
+                '''
+                <pre><code class="language-python">print(1)
+                </code></pre>
+                '''
+            ),
+            extensions=['fenced_code', 'attr_list']
+        )
+
+    def testFencedLanguageAllHighlightOptionsNoCodehiliteWithAttrList(self):
+        self.assertMarkdownRenders(
+            self.dedent(
+                '''
+                ``` { .python linenums guess_lang noclasses }
+                print(1)
+                ```
+                '''
+            ),
+            self.dedent(
+                '''
+                <pre><code class="language-python">print(1)
+                </code></pre>
+                '''
+            ),
+            extensions=['fenced_code', 'attr_list']
+        )
+
+    def testFencedLanguageLinenumsNoCodehiliteNoAttrList(self):
+        self.assertMarkdownRenders(
+            self.dedent(
+                '''
+                ``` { .python linenums }
+                print(1)
+                ```
+                '''
+            ),
+            self.dedent(
+                '''
+                <pre><code class="language-python">print(1)
+                </code></pre>
+                '''
+            ),
+            extensions=['fenced_code']
+        )
+
+    def testFencedCodeAttrDataNoCodehiliteWithAttrList(self):
+        self.assertMarkdownRenders(
+            self.dedent(
+                '''
+                ``` { .python data-x="y" linenums }
+                print(1)
+                ```
+                '''
+            ),
+            self.dedent(
+                '''
+                <pre><code class="language-python" data-x="y">print(1)
+                </code></pre>
+                '''
+            ),
+            extensions=['fenced_code', 'attr_list']
+        )
+
     def testFencedCodeAttrNameSanitizedNoCodehiliteWithAttrList(self):
         # An attribute name is sanitized so it cannot break out of the `code` tag (see #1663).
         self.assertMarkdownRenders(
@@ -1078,4 +1222,103 @@ class TestFencedCodeWithCodehilite(TestCase):
                 ),
                 'fenced_code'
             ]
+        )
+
+
+class TestFencedCodeHighlightOnlyOptions(TestCase):
+    """ Acceptance tests for highlighting-only block options when `codehilite` is not enabled. """
+
+    def render(self, *lines, extensions):
+        return markdown.markdown('\n'.join(lines), extensions=extensions)
+
+    def test_ac_fr_001_1_linenums_flag_ignored_without_codehilite(self):
+        """ `AC-FR-001-1`: the `linenums` flag is ignored without `codehilite`. """
+        html = self.render(
+            '``` { .python linenums }', 'print(1)', '```',
+            extensions=['fenced_code', 'attr_list']
+        )
+        self.assertIn('<pre><code class="language-python">print(1)', html)
+
+    def test_ac_fr_001_2_linenums_true_ignored_without_codehilite(self):
+        """ `AC-FR-001-2`: `linenums=true` is ignored without `codehilite`. """
+        html = self.render(
+            '``` { .python linenums=true }', 'print(1)', '```',
+            extensions=['fenced_code', 'attr_list']
+        )
+        self.assertIn('<pre><code class="language-python">print(1)', html)
+
+    def test_ac_fr_001_3_linenums_quoted_one_ignored_without_codehilite(self):
+        """ `AC-FR-001-3`: `linenums="1"` is ignored without `codehilite`. """
+        html = self.render(
+            '``` { .python linenums="1" }', 'print(1)', '```',
+            extensions=['fenced_code', 'attr_list']
+        )
+        self.assertIn('<pre><code class="language-python">print(1)', html)
+
+    def test_ac_fr_001_4_guess_lang_ignored_without_codehilite(self):
+        """ `AC-FR-001-4`: the `guess_lang` flag is ignored without `codehilite`. """
+        html = self.render(
+            '``` { .python guess_lang }', 'print(1)', '```',
+            extensions=['fenced_code', 'attr_list']
+        )
+        self.assertIn('<pre><code class="language-python">print(1)', html)
+
+    def test_ac_fr_001_5_noclasses_flag_ignored_without_codehilite(self):
+        """ `AC-FR-001-5`: the `noclasses` flag is ignored without `codehilite`. """
+        html = self.render(
+            '``` { .python noclasses }', 'print(1)', '```',
+            extensions=['fenced_code', 'attr_list']
+        )
+        self.assertIn('<pre><code class="language-python">print(1)', html)
+
+    def test_ac_fr_001_6_all_highlight_options_ignored_without_codehilite(self):
+        """ `AC-FR-001-6`: all three highlighting-only flags are ignored without `codehilite`. """
+        html = self.render(
+            '``` { .python linenums guess_lang noclasses }', 'print(1)', '```',
+            extensions=['fenced_code', 'attr_list']
+        )
+        self.assertIn('<pre><code class="language-python">print(1)', html)
+
+    def test_ac_fr_001_7_linenums_ignored_without_attr_list(self):
+        """ `AC-FR-001-7`: the block renders as before when `attr_list` is not enabled. """
+        html = self.render(
+            '``` { .python linenums }', 'print(1)', '```',
+            extensions=['fenced_code']
+        )
+        self.assertIn('<pre><code class="language-python">print(1)', html)
+
+    def test_ac_fr_002_1_other_attributes_kept_on_code_element(self):
+        """ `AC-FR-002-1`: `data-x` is kept on the `code` element while `linenums` is ignored. """
+        html = self.render(
+            '``` { .python data-x="y" linenums }', 'print(1)', '```',
+            extensions=['fenced_code', 'attr_list']
+        )
+        self.assertIn('<pre><code class="language-python" data-x="y">print(1)', html)
+
+    def test_ac_fr_003_1_codehilite_linenums_rendering_unchanged(self):
+        """ `AC-FR-003-1`: with `codehilite` the output matches the existing `linenums` test. """
+        if has_pygments:
+            expected = (
+                '<table class="codehilitetable"><tr>'
+                '<td class="linenos"><div class="linenodiv"><pre>1</pre></div></td>'
+                '<td class="code"><div class="codehilite"><pre><span></span>'
+                '<code><span class="c1"># Some python code</span>\n'
+                '</code></pre></div>\n'
+                '</td></tr></table>'
+            )
+        else:
+            expected = (
+                '<pre class="codehilite"><code class="language-python linenums"># Some python code\n'
+                '</code></pre>'
+            )
+        self.assertMarkdownRenders(
+            self.dedent(
+                '''
+                ``` { .python linenums=True }
+                # Some python code
+                ```
+                '''
+            ),
+            expected,
+            extensions=['codehilite', 'fenced_code']
         )
