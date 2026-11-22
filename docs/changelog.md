@@ -16,6 +16,9 @@ See the [Contributing Guide](contributing.md) for details.
 
 ### Fixed
 
+* Fix a `TypeError` in the `toc` extension when a heading has an empty `id`
+  from `attr_list`, such as `{: id }`. Such a heading now gets an auto-generated
+  id and is listed in the table of contents.
 * Support automatic links with URL schemes other than HTTP and FTP, such as
   `<ssh://example.org>` (#1244).
 * Fix quadratic-time id generation in the `toc` extension when many headers

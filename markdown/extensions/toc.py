@@ -388,7 +388,8 @@ class TocTreeprocessor(Treeprocessor):
         # Get a list of id attributes
         used_ids = set()
         for el in doc.iter():
-            if "id" in el.attrib:
+            # Skip empty ids (`None` from a valueless `attr_list` attribute, or `""`).
+            if el.attrib.get("id"):
                 used_ids.add(el.attrib["id"])
         id_counters: dict[str, int] = {}
 
@@ -399,8 +400,8 @@ class TocTreeprocessor(Treeprocessor):
                 innerhtml = render_inner_html(remove_fnrefs(el), self.md)
                 name = strip_tags(innerhtml)
 
-                # Do not override pre-existing ids
-                if "id" not in el.attrib:
+                # Do not override pre-existing ids; an empty id is treated as missing.
+                if not el.attrib.get("id"):
                     el.attrib["id"] = unique(self.slugify(html.unescape(name), self.sep), used_ids, id_counters)
 
                 data_toc_label = ''
